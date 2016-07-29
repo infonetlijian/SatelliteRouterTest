@@ -1,0 +1,20 @@
+Message stats for scenario mytest
+sim_time: 1066.6000
+created: 433
+started: 306
+relayed: 305
+aborted: 1
+dropped: 0
+removed: 0
+delivered: 235
+delivery_prob: 0.5427
+response_prob: 0.0000
+overhead_ratio: 0.2979
+latency_avg: 2.0902
+latency_med: 1.7000
+hopcount_avg: 1.2213
+hopcount_med: 1
+buffertime_avg: NaN
+buffertime_med: NaN
+rtt_avg: NaN
+rtt_med: NaN
