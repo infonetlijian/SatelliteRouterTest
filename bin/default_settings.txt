@@ -14,9 +14,9 @@ userSetting.nrofPlane = 3
 ## Scenario settings
 Scenario.name = satellite network simulation
 Scenario.simulateConnections = true
-Scenario.updateInterval = 0.1
+Scenario.updateInterval = 60
 # 43200s == 12h
-Scenario.endTime = 6000
+Scenario.endTime = 43200
 
 
 ## Interface-specific settings:
@@ -30,8 +30,8 @@ Scenario.endTime = 6000
 Interface.type = SimpleSatelliteInterface
 #Interface.type = SatelliteLaserInterface
 # Transmit speed of 2 Mbps = 250kBps
-Interface.transmitSpeed = 500k
-Interface.transmitRange = 100
+Interface.transmitSpeed = 100k
+Interface.transmitRange = 50000
 
 # Define 6 different node groups
 Scenario.nrofHostGroups = 1
@@ -67,8 +67,11 @@ Group.movementModel =  PredictableMovement
 Group.sendQueue = 1
 
 #router路由自己创建
-#Group.router = ClusterRouter
-Group.router = DijsktraRouter
+#Group.router = FirstContactRouter
+#Group.router = DirectDeliveryRouter
+#Group.router = EpidemicRouter
+Group.router = GridRouter
+#Group.router = DijsktraRouter
 Group.msgPathLabel = true
 Group.bufferSize = 100M
 Group.waitTime = 0, 120
@@ -78,10 +81,10 @@ Group.interface1 = Interface
 # Walking speeds
 Group.speed = 0.5, 1.5
 # Message TTL of 300 minutes (5 hours)
-Group.msgTtl = 300
+Group.msgTtl = 30
 
 #Group.nrofHosts = [10;20;30;40;50]
-Group.nrofHosts = 50
+Group.nrofHosts = 300
 # group1 (pedestrians) specific settings
 Group1.groupID = Node
 
@@ -96,12 +99,13 @@ Events1.class = MessageEventGenerator
 # (following settings are specific for the MessageEventGenerator class)
 # Creation interval in seconds (one new message every 25 to 35 seconds)
 #Events1.interval = 1,100
-Events1.interval = 1,5
+Events1.interval = 180,180
 # Message sizes (500kB - 1MB)
-Events1.size = 500k,1M
+
+Events1.size = 5M,5M
 # range of message source/destination addresses
 #Events1.hosts = [0,9;0,19;0,29;0,39;0,49]修改，注意hosts和tohosts包括下界但不包括上界，即[0, 9)
-Events1.hosts = [0,10]
+Events1.hosts = [0,18]
 # Message ID prefix
 Events1.prefix = M
 
@@ -110,7 +114,7 @@ Events1.prefix = M
 # seed for movement models' pseudo random number generator (default = 0)
 MovementModel.rngSeed = 1
 # World's size for Movement Models without implicit size (width, height; meters)
-MovementModel.worldSize = 4500, 4500
+MovementModel.worldSize = 80000, 80000
 # How long time to move hosts in the world before real simulation
 MovementModel.warmup = 1000
 
@@ -118,13 +122,16 @@ MovementModel.warmup = 1000
 ## Reports - all report names have to be valid report classes
 
 # how many reports to load
-Report.nrofReports = 1
+Report.nrofReports = 4
 # length of the warm up period (simulated seconds)
 Report.warmup = 0
 # default directory of reports (can be overridden per Report with output setting)
 Report.reportDir = reports/
 # Report classes to load
 Report.report1 = MessageStatsReport
+Report.report2 = MessageDelayReport
+Report.report3 = MessageReport
+Report.report4 = CreatedMessagesReport
 
 ## Default settings for some routers settings
 ProphetRouter.secondsInTimeUnit = 30
@@ -144,7 +151,7 @@ GUI.UnderlayImage.fileName = data/helsinki_underlay.png
 # Image offset in pixels (x, y)
 GUI.UnderlayImage.offset = 64, 20
 # Scaling factor for the image
-GUI.UnderlayImage.scale = 4.75
+GUI.UnderlayImage.scale = 104.75
 # Image rotation (radians)
 GUI.UnderlayImage.rotate = -0.015
 

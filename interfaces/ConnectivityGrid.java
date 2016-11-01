@@ -67,7 +67,7 @@ public class ConnectivityGrid extends ConnectivityOptimizer {
 	private static int worldSizeY;
 	private static int worldSizeZ;//ÐÂÔö
 	private static int cellSizeMultiplier;
-	
+
 	static HashMap<Integer,ConnectivityGrid> gridobjects;
 
 	static {

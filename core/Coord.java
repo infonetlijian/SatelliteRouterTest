@@ -22,7 +22,11 @@ public class Coord implements Cloneable, Comparable<Coord> {
 	public Coord(double x, double y) {
 		setLocation(x,y);
 	}
-	
+	public Coord(double x, double y, double z) {
+		this.x = x;
+		this.y = y;	
+		this.z = z;
+	}
 	/**
 	 * Sets the location of this coordinate object
 	 * @param x The x coordinate to set
@@ -121,7 +125,7 @@ public class Coord implements Cloneable, Comparable<Coord> {
 	 * @return a text representation of the coordinate
 	 */
 	public String toString() {
-		return String.format("(%.2f,%.2f)",x,y);
+		return String.format("(%.2f,%.2f,%.2f)",x,y,z);
 	}
 	
 	/**
@@ -211,10 +215,11 @@ public class Coord implements Cloneable, Comparable<Coord> {
 
 		saot=new SatelliteOrbit(t);
 		//saot.SatelliteOrbit( t);
-		coordinate = saot.getSatelliteCoordinate(time+time_0);
-		this.x = (coordinate[0][0])/10+2000;
-		this.y = (coordinate[0][1])/10+2000;
-		this.z = (coordinate[0][2])/10+2000;
+
+		coordinate = saot.getSatelliteCoordinate(time);
+		this.x = (coordinate[0][0]+40000);
+		this.y = (coordinate[0][1]+40000);
+		this.z = (coordinate[0][2]+40000);
 
 	}
 	public void resetLocation(double x,double y,double z){

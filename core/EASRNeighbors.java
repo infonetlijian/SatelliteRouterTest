@@ -5,10 +5,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 
-import util.Tuple;
 import jat.orbit.SatelliteOrbit;
 
-public class Neighbors {
+public class EASRNeighbors {
 	/** interface name in the group -setting id ({@value})*/
 	public static final String INTERFACENAME_S = "Interface";
 	/** transmit range -setting id ({@value})*/
@@ -32,110 +31,11 @@ public class Neighbors {
 	private List<DTNHost> neighbors = new ArrayList<DTNHost>();//邻居节点列表 
 	private List<DTNHost> hosts = new ArrayList<DTNHost>();//全局卫星节点列表
 	private List<NetworkInterface> potentialNeighbors = new ArrayList<NetworkInterface>();
-	
-	HashMap<DTNHost, List<Double>> leaveTime = new HashMap<DTNHost, List<Double>>();
-	HashMap<DTNHost, List<Double>> startTime = new HashMap<DTNHost, List<Double>>();
-	private double updateInterval = 60;
-	
-	public List<DTNHost> getNeighbors(DTNHost host, double time){
-		//int num = (int)((time-SimClock.getTime())/updateInterval);
-		//time = SimClock.getTime()+num*updateInterval;
-		
-		List<DTNHost> neiHost = new ArrayList<DTNHost>();//邻居列表
-		
-		HashMap<DTNHost, Coord> loc = new HashMap<DTNHost, Coord>();
-		loc.clear();
-		Coord location = new Coord(0,0); 	// where is the host
-		if (!(time == SimClock.getTime())){
-			for (DTNHost h : hosts){//更新指定时刻全局节点的坐标
-				//location.my_Test(time, 0, h.getParameters());
-				//Coord xyz = new Coord(location.getX(), location.getY(), location.getZ());
-				Coord xyz = h.getCoordinate(time);
-				loc.put(h, xyz);//记录指定时刻全局节点的坐标
-			}
-		}
-		else{
-			for (DTNHost h : hosts){//更新指定时刻全局节点的坐标
-				loc.put(h, h.getLocation());//记录指定时刻全局节点的坐标
-			}
-		}
-	
-		Coord myLocation = loc.get(host);
-		for (DTNHost h : hosts){//再分别及计算
-			if (h == host)
-				continue;
-			if (JudgeNeighbors(myLocation, loc.get(host)) == true){
-				neiHost.add(h);
-			}
-		}
-		System.out.println(host+" neighbor: "+neiHost+" time: "+time);
-		return neiHost;
-	}
-	
-	
-	public Tuple<HashMap<DTNHost, List<Double>>, //neiList 为已经计算出的当前邻居节点列表
-			HashMap<DTNHost, List<Double>>> getFutureNeighbors(List<DTNHost> neiList, DTNHost host, double time){
-		int num = (int)((time-SimClock.getTime())/updateInterval);
-		time = SimClock.getTime()+num*updateInterval;
-		
-		HashMap<DTNHost, List<Double>> leaveTime = new HashMap<DTNHost, List<Double>>();
-		HashMap<DTNHost, List<Double>> startTime = new HashMap<DTNHost, List<Double>>();
-		for (DTNHost neiHost : neiList){
-			List<Double> t= new ArrayList<Double>();
-			t.add(SimClock.getTime());
-			startTime.put(neiHost, t);//添加已存在邻居节点的开始时间
-		}
-		
-		List<DTNHost> futureList = new ArrayList<DTNHost>();//(邻居网格内的节点集合)
-		
-		for (; time < SimClock.getTime() + msgTtl*60; time += updateInterval){
-			List<DTNHost> neighborList = getNeighbors(host, time);
-			
-			for (DTNHost ni : neighborList){
-				if (ni == this.host)//排除自身节点
-					continue;
-				if (!neiList.contains(ni))//如果现有邻居中没有，则一定是未来将到达的邻居					
-					futureList.add(ni); //此为未来将会到达的邻居(当然对于当前已有的邻居，也可能会中途离开，然后再回来)
-				
-				/**如果是未来到达的邻居，直接get会返回空指针，所以要先加startTime和leaveTime判断**/
-				if (startTime.containsKey(ni)){
-					/*if (leaveTime.containsKey(ni)){//有两种情况，一种在预测时间段内此邻居会离开，另一种情况是此邻居不仅在此时间段内会离开还会回来
-						if (startTime.get(ni).size() == leaveTime.get(ni).size()){//如果不相等则一定是邻居节点离开的情况					
-							List<Double> mutipleTime= leaveTime.get(ni);
-							mutipleTime.add(time);
-							startTime.put(ni, mutipleTime);//将此新的开始时间加入
-						}
-						else{
-							List<Double> mutipleTime= leaveTime.get(ni);
-							mutipleTime.add(time);
-							leaveTime.put(ni, mutipleTime);//将此新的离开时间加入
-						}	
-					}
-					else{
-						List<Double> mutipleTime= new ArrayList<Double>();
-						mutipleTime.add(time);
-						leaveTime.put(ni, mutipleTime);//将此新的离开时间加入
-					}*/
-				}
-				else{
-					//System.out.println(this.host+" 出现预测节点: "+ni+" 时间  "+time);
-					List<Double> mutipleTime= new ArrayList<Double>();
-					mutipleTime.add(time);
-					startTime.put(ni, mutipleTime);//将此新的开始时间加入
-				}
-				/**如果是未来到达的邻居，直接get会返回空指针，所以要先加startTime和leaveTime判断**/
-			}	
-		}
-		Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime= //二元组合并开始和结束时间
-				new Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>>(startTime, leaveTime); 
-		return predictTime;
-	}
-	
 	/**
 	 * 初始化函数
 	 * @param host
 	 */
-	public Neighbors(DTNHost host){
+	public EASRNeighbors(DTNHost host){
 		this.host = host;
 		Settings s = new Settings(INTERFACENAME_S);
 		transmitRange = s.getDouble(TRANSMIT_RANGE_S);//从配置文件中读取传输速率
@@ -144,9 +44,9 @@ public class Neighbors {
 		Settings se = new Settings("Group");
 		msgTtl = se.getDouble("msgTtl");
 		//System.out.println(msgTtl);
-		PREDICT_TIME = msgTtl*60;
+		PREDICT_TIME = msgTtl;
 	}
-	public Neighbors(List<DTNHost> hosts){
+	public EASRNeighbors(List<DTNHost> hosts){
 		this.hosts=hosts;
 	}
 	/**
@@ -267,7 +167,7 @@ public class Neighbors {
 		}
 		
 		double timeNow = SimClock.getTime();
-		for (double time = timeNow; time < SimClock.getTime()+msgTtl*60; time += INTERVAL){//粗搜索，搜索步长大
+		for (double time = timeNow; time < SimClock.getTime()+msgTtl; time += INTERVAL){//粗搜索，搜索步长大
 			if (JudgeNeighbors(this.host.getCoordinate(time), host.getCoordinate(time)) == false){//如果仍然在邻居范围内就继续增加时间，暴力搜索
 				for (double var = time - INTERVAL; var <= time; var += 0.1){//找到了大概范围之后改为细搜索，按照系统的updateInterval作为搜索步长
 					if (JudgeNeighbors(this.host.getCoordinate(var), host.getCoordinate(var)) == false){
@@ -358,7 +258,7 @@ public class Neighbors {
 			}
 			else{
 				if (this.potentialNeighborsStartTime.containsKey(host) == false){//已经预测过的就不用再算了	
-					for (double time = SimClock.getTime(); time < SimClock.getTime()+msgTtl*60; time += INTERVAL){
+					for (double time = SimClock.getTime(); time < SimClock.getTime()+msgTtl; time += INTERVAL){
 						if (JudgeNeighbors(this.host.getCoordinate(time) , 
 								host.getCoordinate(time)) == true){//判断什么时候才会成为邻居
 							for (double var = time - INTERVAL; var < time; var += 0.1){
@@ -398,7 +298,7 @@ public class Neighbors {
 			if (this.potentialNeighborsStartTime.get(host)[0] == 
 					this.potentialNeighborsStartTime.get(host)[1] && 
 					this.potentialNeighborsStartTime.get(host)[0] > 0){//保证对未来可能成为邻居的节点不会重复预测，同时也要排除不可能成为邻居的节点
-				for (double time = this.potentialNeighborsStartTime.get(host)[0]; time < SimClock.getTime()+msgTtl*60; time += INTERVAL){
+				for (double time = this.potentialNeighborsStartTime.get(host)[0]; time < SimClock.getTime()+msgTtl; time += INTERVAL){
 					if (JudgeNeighbors(this.host.getCoordinate(time), 
 							host.getCoordinate(time)) == false){//判断什么时候才会离开
 						for (double var = time - INTERVAL; var < time; var += 0.1){

@@ -87,7 +87,7 @@ public class SatelliteOrbit implements Printable {
 			tb.propagate(t);
 		}
 		
-		satellitecoordinate = new double[1][3] ;
+		satellitecoordinate = new double[1][3];
 		satellitecoordinate[0][0] = tb.rv.x[0];
 		satellitecoordinate[0][1] = tb.rv.x[1];
 		satellitecoordinate[0][2] = tb.rv.x[2];

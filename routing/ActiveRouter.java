@@ -620,7 +620,7 @@ public abstract class ActiveRouter extends MessageRouter {
 				removeCurrent = true;
 			} 
 			/*** 3. 必要时，删除那些最早接收到且不正在传输的消息 ***/
-			if (removeCurrent) {
+				if (removeCurrent) {
 				// if the message being sent was holding excess buffer, free it
 				if (this.getFreeBufferSize() < 0) {//buffer中所有信息是否已超出容量
 					this.makeRoomForMessage(0);//清除旧信息

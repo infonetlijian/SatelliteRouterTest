@@ -41,6 +41,7 @@ public class DTNHost implements Comparable<DTNHost> {
 	/*修改函数部分!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 	private  double []parameters= new double[6];
 	private Neighbors nei;//新增;
+	//private GridNeighbors GN;
 	
 	/** namespace for host group settings ({@value})*/
 	public static final String GROUP_NS = "Group";
@@ -50,7 +51,8 @@ public class DTNHost implements Comparable<DTNHost> {
 	//private static final int NROF_SATELLITES = 1024;//总节点数
 	//private static final int NROF_S_EACHPLANE = NROF_SATELLITES/NROF_PLANE;//每个轨道平面上的节点数
 	
-	private List<DTNHost> hosts;
+	private List<DTNHost> hosts;//全局卫星节点列表
+	
 	private int totalSatellites;//总节点数
 	private int totalPlane;//总平面数
 	private int nrofPlane;//卫星所属轨道平面编号
@@ -106,6 +108,9 @@ public class DTNHost implements Comparable<DTNHost> {
 				l.initialLocation(this, this.location);
 			}
 		}
+		
+		/*新增*/
+		//this.GN = new GridNeighbors(this);
 	}
 
 	/**
@@ -523,43 +528,17 @@ public class DTNHost implements Comparable<DTNHost> {
 		double possibleMovement;
 		double distance;
 		double dx, dy;
-
-		/*if (!isMovementActive() || SimClock.getTime() < this.nextTimeToMove) {
-			return; 
-		}
-		if (this.destination == null) {
-			if (!setNextWaypoint()) {
-				return;
-			}
-		}
-		*/
-		
 		
 		this.location.my_Test(SimClock.getTime(),timeIncrement,this.parameters);
-		
-		/*
-		possibleMovement = timeIncrement * speed;
-		distance = this.location.distance(this.destination);
+		//System.out.println(this+" time: "+SimClock.getTime()+"  "+location);
+		//System.out.println(SimClock.getTime()+"  "+this+"  "+location.getX()+"  "+location.getY()+"  "+location.getZ());
 
-		while (possibleMovement >= distance) {
-			// node can move past its next destination
-			this.location.setLocation(this.destination); // snap to destination
-			possibleMovement -= distance;
-			if (!setNextWaypoint()) { // get a new waypoint
-				return; // no more waypoints left
-			}
-			distance = this.location.distance(this.destination);
-		}
-
-		// move towards the point for possibleMovement amount
-		dx = (possibleMovement/distance) * (this.destination.getX() -
-				this.location.getX());
-		dy = (possibleMovement/distance) * (this.destination.getY() -
-				this.location.getY());
-		this.location.translate(dx, dy);
-		*/
 	}	
 	/*新增函数*/
+	//public GridNeighbors getGridNeighbors(){
+	//	return GN;
+	//}
+	
 	public void setSatelliteParameters(int totalSatellites, int totalPlane, int nrofPlane, int nrofSatelliteInPlane, double[] parameters){
 		
 		for (int i = 0; i < 6; i++){
@@ -567,6 +546,7 @@ public class DTNHost implements Comparable<DTNHost> {
 		}
 		
 		this.nei = new Neighbors(this);//新增
+		
 		
 		/*新增参数*/
 		this.totalSatellites = totalSatellites;//总节点数
@@ -601,7 +581,7 @@ public class DTNHost implements Comparable<DTNHost> {
 		//saot.SatelliteOrbit(t);
 		coordinate = saot.getSatelliteCoordinate(time);
 		Coord c = new Coord(0,0);
-		c.resetLocation((coordinate[0][0])/10+2000, (coordinate[0][1])/10+2000, (coordinate[0][2])/10+2000);
+		c.resetLocation((coordinate[0][0])+15000, (coordinate[0][1])+15000, (coordinate[0][2])+15000);
 		return c;
 	}
 	/**
@@ -621,10 +601,16 @@ public class DTNHost implements Comparable<DTNHost> {
 	}
 	public void changeHostsList(List<DTNHost> hosts){
 		 this.nei.changeHostsList(hosts);
+		 //this.GN.setHostsList(hosts);
+		 //this.router.setTotalHosts(hosts);
 		 this.hosts = hosts;
 	}
 	public void updateLocation(double timeNow){
 		this.location.my_Test(0.0,timeNow,this.parameters);//修改节点的位置,获取timeNow时刻的位置
 	}
-
+	public List<DTNHost> getHostsList(){
+		List<DTNHost> totalhosts = new ArrayList<DTNHost>();
+		totalhosts = this.hosts;
+		return totalhosts;
+	}
 }
