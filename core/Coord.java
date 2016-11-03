@@ -217,7 +217,7 @@ public class Coord implements Cloneable, Comparable<Coord> {
 		//saot.SatelliteOrbit( t);
 
 		coordinate = saot.getSatelliteCoordinate(time);
-		this.x = (coordinate[0][0]+40000);
+		this.x = (coordinate[0][0]+40000);//×ø˜ËÝSÆ½ÒÆ
 		this.y = (coordinate[0][1]+40000);
 		this.z = (coordinate[0][2]+40000);
 

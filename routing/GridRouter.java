@@ -423,8 +423,9 @@ public class GridRouter extends ActiveRouter{
 				routerTable.put(minHost, minPath);
 			}
 			iteratorTimes++;
-			sourceSet.clear();
-			sourceSet.addAll(routerTable.keySet());
+			sourceSet.add(minHost);//将新的最短节点加入
+			if (routerTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
+				break;
 		}
 		routerTableUpdateLabel = true;
 		
@@ -704,7 +705,7 @@ public class GridRouter extends ActiveRouter{
 		private double transmitRange;
 		private double msgTtl;
 		
-		private double updateInterval =60;
+		private double updateInterval = 1;
 		
 		private GridCell[][][] cells;//GridCell这个类，创建一个实例代表一个单独的网格，整个world创建了一个三维数组存储这个网格，每个网格内又存储了当前在其中的host的networkinterface
 		private HashMap<NetworkInterface, GridCell> ginterfaces;

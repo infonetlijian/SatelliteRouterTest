@@ -18,7 +18,7 @@ public class Neighbors {
 	/** simulation end time -setting id ({@value})*/
 	public static final String SIMULATION_END_TIME = "endTime";
 	
-	private static final double INTERVAL = 10;
+	private static final double INTERVAL = 1;
 	private static final double MIN_PREDICT_TIME = 100;
 	private double PREDICT_TIME = 600;
 	
@@ -35,7 +35,7 @@ public class Neighbors {
 	
 	HashMap<DTNHost, List<Double>> leaveTime = new HashMap<DTNHost, List<Double>>();
 	HashMap<DTNHost, List<Double>> startTime = new HashMap<DTNHost, List<Double>>();
-	private double updateInterval = 60;
+	private double updateInterval = 1;
 	
 	public List<DTNHost> getNeighbors(DTNHost host, double time){
 		//int num = (int)((time-SimClock.getTime())/updateInterval);
@@ -59,16 +59,17 @@ public class Neighbors {
 				loc.put(h, h.getLocation());//记录指定时刻全局节点的坐标
 			}
 		}
-	
+		
 		Coord myLocation = loc.get(host);
 		for (DTNHost h : hosts){//再分别及计算
 			if (h == host)
 				continue;
-			if (JudgeNeighbors(myLocation, loc.get(host)) == true){
+			if (JudgeNeighbors(myLocation, loc.get(h)) == true){
+				//System.out.println(host+"  locate  "+myLocation+"  "+loc.get(host));
 				neiHost.add(h);
 			}
 		}
-		System.out.println(host+" neighbor: "+neiHost+" time: "+time);
+		//System.out.println(host+" neighbor: "+neiHost+" time: "+time);
 		return neiHost;
 	}
 	

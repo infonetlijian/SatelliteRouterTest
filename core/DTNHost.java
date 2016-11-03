@@ -581,7 +581,7 @@ public class DTNHost implements Comparable<DTNHost> {
 		//saot.SatelliteOrbit(t);
 		coordinate = saot.getSatelliteCoordinate(time);
 		Coord c = new Coord(0,0);
-		c.resetLocation((coordinate[0][0])+15000, (coordinate[0][1])+15000, (coordinate[0][2])+15000);
+		c.resetLocation((coordinate[0][0])+40000, (coordinate[0][1])+40000, (coordinate[0][2])+40000);
 		return c;
 	}
 	/**

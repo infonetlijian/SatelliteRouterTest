@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 
 import movement.MovementModel;
 import util.Tuple;
@@ -51,6 +52,8 @@ public class EASRRouter extends ActiveRouter{
 	private HashMap<String, Double> busyLabel = new HashMap<String, Double>();//指示下一跳节点处于忙的状态，需要等待
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> neighborsList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();//新增全局其它节点邻居链路生存时间信息
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> predictList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();
+	
+	Random random = new Random();//用于在相同時延開銷下進行隨機選擇
 	/**
 	 * 初始化
 	 * @param s
@@ -301,6 +304,7 @@ public class EASRRouter extends ActiveRouter{
 		//updatePredictionRouter(msg);//需要进行预测
 		if (this.routerTable.containsKey(msg.getTo())){//预测也找不到到达目的节点的路径，则路由失败
 			//m.changeRouterPath(this.routerTable.get(m.getTo()));//把计算出来的路径直接写入信息当中
+			System.out.println("成功寻路!!!!!!");
 			return true;//找到了路径
 		}else{
 			System.out.println("寻路失败！！！");
@@ -329,6 +333,7 @@ public class EASRRouter extends ActiveRouter{
 			arrivalTime.put(neiHost, time);
 			routerTable.put(neiHost, path);
 		}
+		System.out.println(this.getHost()+" :  "+routerTable);
 		/*添加链路可探测到的一跳邻居，并更新路由表*/
 		
 		int iteratorTimes = 0;
@@ -356,7 +361,7 @@ public class EASRRouter extends ActiveRouter{
 				HashMap<DTNHost, List<Double>> startTime;
 				HashMap<DTNHost, List<Double>> leaveTime;
 				
-				if (predictionList.containsKey(host)){//存储机制，如果之前已经算过就不用再重复计算了
+				if (predictionList.containsKey(host) && false){//存储机制，如果之前已经算过就不用再重复计算了
 					predictTime = predictionList.get(host);
 				}
 				else{
@@ -389,11 +394,13 @@ public class EASRRouter extends ActiveRouter{
 					path.add(hop);//注意顺序
 					if (time > SimClock.getTime() + msgTtl)
 						continue;
-					if (time < minTime){
-						minTime = time;
-						minHost = neiHost;
-						minPath = path;
-						updateLabel = true;	
+					if (time <= minTime){
+						if (random.nextBoolean() == true && time - minTime < 1){
+							minTime = time;
+							minHost = neiHost;
+							minPath = path;
+							updateLabel = true;	
+						}
 					}					
 				}
 			}
@@ -402,10 +409,9 @@ public class EASRRouter extends ActiveRouter{
 				routerTable.put(minHost, minPath);
 			}
 			iteratorTimes++;
-			sourceSet.clear();
-			sourceSet.addAll(routerTable.keySet());//将新的最短节点加入
-			if (routerTable.containsKey(msg.getTo()))
-				break;//如果中途找到，就直接退出搜索
+			sourceSet.add(minHost);//将新的最短节点加入
+			if (routerTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
+				break;
 		}
 		System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());
 	}
