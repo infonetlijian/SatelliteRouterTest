@@ -1,2 +1,0 @@
-# messages: ID, start time, end time
-M1 17.0000 23.0000

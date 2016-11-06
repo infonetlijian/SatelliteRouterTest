@@ -1,2 +1,0 @@
-# time  ID  size  fromHost  toHost  TTL  isResponse
-17.0000 M1 518834 Node6 Node10 30 N 

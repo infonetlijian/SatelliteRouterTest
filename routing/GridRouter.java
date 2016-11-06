@@ -334,8 +334,17 @@ public class GridRouter extends ActiveRouter{
 			GN.setHostsList(hosts);
 		}
 		//GridNeighbors GN = this.getHost().getGridNeighbors();
+		Settings s = new Settings(GROUPNAME_S);
+		int option = s.getInt("withoutorwithOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
 		
-		GN.updateGrid();//更新网格表
+		switch (option){
+		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
+			GN.updateGrid_without_OrbitCalculation();//更新网格表
+			break;
+		case 2:
+			GN.updateGrid_with_OrbitCalculation();//更新网格表
+			break;
+		}
 		
 		/*添加链路可探测到的一跳邻居，并更新路由表*/
 		List<DTNHost> sourceSet = new ArrayList<DTNHost>();
@@ -1135,7 +1144,7 @@ public class GridRouter extends ActiveRouter{
 		/**
 		 * 提前计算了各个轨道在一个周期内的网格历遍情况，生成轨道对应的历经网格表，根据此表就可以计算相互之间未来的关系，而无需再计算轨道
 		 */
-		public void updateGrid(){
+		public void updateGrid_without_OrbitCalculation(){
 			if (gridLocation.isEmpty())//初始化只执行一次
 				initializeGridLocation();
 			
@@ -1187,7 +1196,7 @@ public class GridRouter extends ActiveRouter{
 		/**
 		 * GridRouter的更新过程函数
 		 */
-	/*	public void updateGrid(){			
+		public void updateGrid_with_OrbitCalculation(){			
 			ginterfaces.clear();//每次清空
 			Coord location = new Coord(0,0); 	// where is the host
 			double simClock = SimClock.getTime();
@@ -1212,7 +1221,7 @@ public class GridRouter extends ActiveRouter{
 				//CreateGrid(cellSize);//包含cells的new和ginterfaces的new
 			}
 			
-		}*/
+		}
 		
 		
 		public GridCell updateLocation(double time, Coord location, DTNHost host){
