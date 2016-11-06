@@ -1,0 +1,20 @@
+Message stats for scenario satellite network simulation
+sim_time: 298.0000
+created: 29
+started: 39
+relayed: 39
+aborted: 0
+dropped: 0
+removed: 0
+delivered: 12
+delivery_prob: 0.4138
+response_prob: 0.0000
+overhead_ratio: 2.2500
+latency_avg: 29.8333
+latency_med: 30.0000
+hopcount_avg: 3.2500
+hopcount_med: 3
+buffertime_avg: NaN
+buffertime_med: NaN
+rtt_avg: NaN
+rtt_med: NaN

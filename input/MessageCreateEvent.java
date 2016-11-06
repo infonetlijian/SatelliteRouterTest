@@ -38,11 +38,11 @@ public class MessageCreateEvent extends MessageEvent {
 	 */
 	@Override
 	public void processEvent(World world) {
-		//DTNHost to = world.getNodeByAddress(this.toAddr);
-		//DTNHost from = world.getNodeByAddress(this.fromAddr);			
+		DTNHost to = world.getNodeByAddress(this.toAddr);
+		DTNHost from = world.getNodeByAddress(this.fromAddr);			
 		
-		DTNHost to = world.getNodeByAddress(11);
-		DTNHost from = world.getNodeByAddress(1);
+		//DTNHost to = world.getNodeByAddress(11);
+		//DTNHost from = world.getNodeByAddress(1);
 		
 		Message m = new Message(from, to, this.id, this.size);//产生新的消息
 		

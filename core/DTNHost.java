@@ -51,7 +51,7 @@ public class DTNHost implements Comparable<DTNHost> {
 	//private static final int NROF_SATELLITES = 1024;//总节点数
 	//private static final int NROF_S_EACHPLANE = NROF_SATELLITES/NROF_PLANE;//每个轨道平面上的节点数
 	
-	private List<DTNHost> hosts;//全局卫星节点列表
+	private List<DTNHost> hosts = new ArrayList<DTNHost>();//全局卫星节点列表
 	
 	private int totalSatellites;//总节点数
 	private int totalPlane;//总平面数
@@ -584,6 +584,13 @@ public class DTNHost implements Comparable<DTNHost> {
 		c.resetLocation((coordinate[0][0])+40000, (coordinate[0][1])+40000, (coordinate[0][2])+40000);
 		return c;
 	}
+	public double getPeriod(){
+
+		SatelliteOrbit saot = new SatelliteOrbit(this.parameters);
+		//saot.SatelliteOrbit(t);
+		double period = saot.getPeriod();
+		return period;
+	}
 	/**
 	 * 新增函数，返回新增的邻居数据库
 	 * @return
@@ -611,6 +618,6 @@ public class DTNHost implements Comparable<DTNHost> {
 	public List<DTNHost> getHostsList(){
 		List<DTNHost> totalhosts = new ArrayList<DTNHost>();
 		totalhosts = this.hosts;
-		return totalhosts;
+		return this.hosts;//totalhosts;
 	}
 }

@@ -71,6 +71,7 @@ Group.sendQueue = 1
 #Group.router = DirectDeliveryRouter
 #Group.router = EpidemicRouter
 Group.router = GridRouter
+Group.layer = 2
 #Group.router = EASRRouter
 #Group.router = DijsktraRouter
 Group.msgPathLabel = true
@@ -100,7 +101,7 @@ Events1.class = MessageEventGenerator
 # (following settings are specific for the MessageEventGenerator class)
 # Creation interval in seconds (one new message every 25 to 35 seconds)
 #Events1.interval = 1,100
-Events1.interval = 10,10
+Events1.interval = 10,20
 # Message sizes (500kB - 1MB)
 
 Events1.size = 100k,1M

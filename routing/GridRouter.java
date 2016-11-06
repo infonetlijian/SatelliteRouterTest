@@ -69,13 +69,14 @@ public class GridRouter extends ActiveRouter{
 	 */
 	protected GridRouter(GridRouter r) {
 		super(r);
-		this.GN = new GridNeighbors(this.getHost());
+		this.GN = new GridNeighbors(this.getHost());//不放在这的原因是，当执行这一步初始化的时候，host和router还没有完成绑定操作
 	}
 	/**
 	 * 复制此router类
 	 */
 	@Override
 	public MessageRouter replicate() {
+		//this.GN = new GridNeighbors(this.getHost());
 		return new GridRouter(this);
 	}
 	/**
@@ -84,6 +85,9 @@ public class GridRouter extends ActiveRouter{
 	@Override
 	public void update() {
 		super.update();
+		
+		//if (GN.getHost() == null)
+		GN.setHost(this.getHost());//为了实现GN和Router以及Host之间的绑定，待修改！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 		
 		/*测试代码，保证neighbors和connections的一致性*/
 		List<DTNHost> conNeighbors = new ArrayList<DTNHost>();
@@ -330,6 +334,7 @@ public class GridRouter extends ActiveRouter{
 			GN.setHostsList(hosts);
 		}
 		//GridNeighbors GN = this.getHost().getGridNeighbors();
+		
 		GN.updateGrid();//更新网格表
 		
 		/*添加链路可探测到的一跳邻居，并更新路由表*/
@@ -717,12 +722,20 @@ public class GridRouter extends ActiveRouter{
 		private  int worldSizeY;
 		private  int worldSizeZ;//新增
 		
+		private int gridLayer;
+		
 		private List<GridCell[][][]> GridList = new ArrayList<GridCell[][][]>();
 		private HashMap<Double, HashMap<NetworkInterface, GridCell>> gridmap = new HashMap<Double, HashMap<NetworkInterface, GridCell>>();
 		private HashMap<Double, HashMap<GridCell, List<DTNHost>>> cellmap = new HashMap<Double, HashMap<GridCell, List<DTNHost>>>();
 		
+		/*用于初始化时，计算各个节点在一个周期内的网格坐标*/
+		private HashMap <DTNHost, List<GridCell>> gridLocation = new HashMap<DTNHost, List<GridCell>>();//存放节点所经过的网格
+		private HashMap <DTNHost, List<Double>> gridTime = new HashMap<DTNHost, List<Double>>();//存放节点经过这些网格时的时间
+		private HashMap <DTNHost, Double> periodMap = new HashMap <DTNHost, Double>();//记录各个节点轨道的周期
+		
 		public GridNeighbors(DTNHost host){
 			this.host = host;
+			//System.out.println(this.host);
 			Settings se = new Settings("Interface");
 			transmitRange = se.getDouble("transmitRange");//从配置文件中读取传输速率
 			Settings set = new Settings("Group");
@@ -734,14 +747,30 @@ public class GridRouter extends ActiveRouter{
 			worldSizeY = worldSize[1];
 			worldSizeZ = worldSize[1];//新增三维变量，待检查！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 			
-			//cellSize = (int) (transmitRange*0.5773502);
-			cellSize = (int) (transmitRange*0.288);//Layer=2
-			//cellSize = (int) (transmitRange*0.14433);//Layer=3
+			Settings layer = new Settings("Group");
+			this.gridLayer = layer.getInt("layer");
+			
+			switch(this.gridLayer){
+			case 1 : 
+				cellSize = (int) (transmitRange*0.288);//Layer=2
+				break;
+			case 2 : 
+				cellSize = (int) (transmitRange*0.14433);//Layer=3
 			//cellSize = (int) (transmitRange*0.0721687);//Layer=4
+				break;
+			default :
+				cellSize = (int) (transmitRange*0.288);//Layer=2
+				break;
+			}
+			//cellSize = (int) (transmitRange*0.5773502);
+			
 			CreateGrid(cellSize);
+			/*初始化，前提算好卫星轨道信息*/
 			
 		}
-
+		public void setHost(DTNHost h){
+			this.host = h;
+		}
 		public DTNHost getHost(){
 			return this.host;
 		}
@@ -765,7 +794,48 @@ public class GridRouter extends ActiveRouter{
 			}
 			ginterfaces = new HashMap<NetworkInterface,GridCell>();
 		}
-		
+		/**
+		 * 遍歷所有節點，對每個節點遍歷一個週期，記錄其一個週期內遍歷過的網格，并找到對應的進入和離開時間
+		 */
+		public void initializeGridLocation(){	
+			this.host.getHostsList();
+			for (DTNHost h : this.host.getHostsList()){//對每個節點遍歷一個週期，記錄其一個週期內遍歷過的網格，并找到對應的進入和離開時間
+				double period = getPeriodofOrbit(h);
+				this.periodMap.put(h, period);
+				System.out.println(h+"  "+period);
+				
+				List<GridCell> gridList = new ArrayList<GridCell>();
+				List<Double> intoTime = new ArrayList<Double>();
+				List<Double> outTime = new ArrayList<Double>();
+				GridCell startCell;//记录起始网格
+				for (double time = 0; time < period; time += updateInterval){
+					Coord c = h.getCoordinate(time);
+					GridCell gc = cellFromCoord(c);//根據坐標找到對應的網格
+					if (!gridList.contains(gc)){
+						if (gridList.isEmpty())
+							startCell = gc;//记录起始网格
+						gridList.add(gc);//第一次检测到节点进入此网格（注意，边界检查！！！开始和结束的时候！！！!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!）
+						intoTime.add(time);//记录相应的进入时间
+					}	
+					else{
+						//if (gc. == startCell)
+							//intoTime = time;
+					}
+				}
+				gridLocation.put(h, gridList);//遍历完一个节点就记录下来
+				gridTime.put(h, intoTime);
+			}
+			System.out.println(gridLocation);
+		}
+		/**
+		 * 獲取指定衛星節點的運行週期時間
+		 * @param h
+		 * @return
+		 */
+		public double getPeriodofOrbit(DTNHost h){
+			return h.getPeriod();
+		}
+			
 		public List<DTNHost> getNeighbors(DTNHost host, double time){//获取指定时间的邻居节点(同时包含预测到TTL时间内的邻居)
 			int num = (int)((time-SimClock.getTime())/updateInterval);
 			time = SimClock.getTime()+num*updateInterval;
@@ -867,69 +937,83 @@ public class GridRouter extends ActiveRouter{
 			HashMap<GridCell, List<DTNHost>> cellToHost = cellmap.get(time);//获取time时刻的全局网格表
 			List<GridCell> GC = new ArrayList<GridCell>();
 			/***********************************************************************/
-
+			switch(this.gridLayer){
+			case 1 : 
 			/*两层网格分割*/
-			for (int i = -1; i < 2; i += 1){
+				for (int i = -1; i < 2; i += 1){
+					for (int j = -1; j < 2; j += 1){
+						for (int k = -1; k < 2; k += 1){
+							GC.add(cells[row+i][col+j][z+k]);
+						}
+					}
+				}
+				break;
+			case 2 : {
+			/*三层网格分割*/
+				for (int i = -3; i <= 3; i += 1){
+					for (int j = -3; j <= 3; j += 1){
+						for (int k = -3; k <= 3; k += 1){
+							if (boundaryCheck(row+i,col+j,z+k))
+								GC.add(cells[row+i][col+j][z+k]);
+	
+						}
+					}
+				}
 				for (int j = -1; j < 2; j += 1){
 					for (int k = -1; k < 2; k += 1){
-						GC.add(cells[row+i][col+j][z+k]);
-						
+						if (boundaryCheck(row+4,col+j,z+k)){
+							GC.add(cells[row+4][col+j][z+k]);
+	
+						}
 					}
 				}
+				for (int j = -1; j < 2; j += 1){
+					for (int k = -1; k < 2; k += 1){
+						if (boundaryCheck(row-4,col+j,z+k))
+							GC.add(cells[row-4][col+j][z+k]);
+	
+					}
+				}
+				for (int j = -1; j < 2; j += 1){
+					for (int k = -1; k < 2; k += 1){
+						if (boundaryCheck(row+j,col+4,z+k))
+							GC.add(cells[row+j][col+4][z+k]);
+	
+					}
+				}
+				for (int j = -1; j < 2; j += 1){
+					for (int k = -1; k < 2; k += 1){
+						if (boundaryCheck(row+j,col-4,z+k))
+							GC.add(cells[row+j][col-4][z+k]);
+	
+					}
+				}
+				for (int j = -1; j < 2; j += 1){
+					for (int k = -1; k < 2; k += 1){
+						if (boundaryCheck(row+j,col+k,z+4))
+							GC.add(cells[row+j][col+k][z+4]);
+	
+					}
+				}
+				for (int j = -1; j < 2; j += 1){
+					for (int k = -1; k < 2; k += 1){
+						if (boundaryCheck(row+j,col+k,z-4))
+							GC.add(cells[row+j][col+k][z-4]);
+	
+					}
+				}	
 			}
-			
-			/*三层网格分割*/
-			/*for (int i = -3; i <= 3; i += 1){
-				for (int j = -3; j <= 3; j += 1){
-					for (int k = -3; k <= 3; k += 1){
-						if (boundaryCheck(row+i,col+j,z+k))
+			break;
+			default :/*两层网格分割*/
+				for (int i = -1; i < 2; i += 1){
+					for (int j = -1; j < 2; j += 1){
+						for (int k = -1; k < 2; k += 1){
 							GC.add(cells[row+i][col+j][z+k]);
-
+							
+						}
 					}
 				}
-			}
-			for (int j = -1; j < 2; j += 1){
-				for (int k = -1; k < 2; k += 1){
-					if (boundaryCheck(row+4,col+j,z+k)){
-						GC.add(cells[row+4][col+j][z+k]);
-
-					}
-				}
-			}
-			for (int j = -1; j < 2; j += 1){
-				for (int k = -1; k < 2; k += 1){
-					if (boundaryCheck(row-4,col+j,z+k))
-						GC.add(cells[row-4][col+j][z+k]);
-
-				}
-			}
-			for (int j = -1; j < 2; j += 1){
-				for (int k = -1; k < 2; k += 1){
-					if (boundaryCheck(row+j,col+4,z+k))
-						GC.add(cells[row+j][col+4][z+k]);
-
-				}
-			}
-			for (int j = -1; j < 2; j += 1){
-				for (int k = -1; k < 2; k += 1){
-					if (boundaryCheck(row+j,col-4,z+k))
-						GC.add(cells[row+j][col-4][z+k]);
-
-				}
-			}
-			for (int j = -1; j < 2; j += 1){
-				for (int k = -1; k < 2; k += 1){
-					if (boundaryCheck(row+j,col+k,z+4))
-						GC.add(cells[row+j][col+k][z+4]);
-
-				}
-			}
-			for (int j = -1; j < 2; j += 1){
-				for (int k = -1; k < 2; k += 1){
-					if (boundaryCheck(row+j,col+k,z-4))
-						GC.add(cells[row+j][col+k][z-4]);
-
-				}
+				break;
 			}
 			/*四层层网格分割*/
 			/*	for (int i = -7; i <= 7; i += 1){
@@ -1047,8 +1131,63 @@ public class GridRouter extends ActiveRouter{
 			return this.hosts.isEmpty();
 		}
 		
-		public void updateGrid(){	
-
+		
+		/**
+		 * 提前计算了各个轨道在一个周期内的网格历遍情况，生成轨道对应的历经网格表，根据此表就可以计算相互之间未来的关系，而无需再计算轨道
+		 */
+		public void updateGrid(){
+			if (gridLocation.isEmpty())//初始化只执行一次
+				initializeGridLocation();
+			
+			ginterfaces.clear();//每次清空
+			Coord location = new Coord(0,0); 	// where is the host
+			double simClock = SimClock.getTime();
+			
+			for (double time = simClock; time <= simClock + msgTtl*60; time += updateInterval){
+				HashMap<GridCell, List<DTNHost>> cellToHost= new HashMap<GridCell, List<DTNHost>>();
+				for (DTNHost host : hosts){
+					List<GridCell> gridCellList = this.gridLocation.get(host);
+					List<Double> timeList = this.gridTime.get(host);
+					double period = this.periodMap.get(host);
+					double t0 = time;
+					GridCell cell = new GridCell();
+					boolean label = false;
+					int iterator = 0;
+					if (time >= period)
+						t0 = t0 % period;//大于周期就取余操作
+					for (double t : timeList){
+						if (t >= t0){
+							cell = gridCellList.get(iterator);
+							label = true;
+							break;
+						}
+						iterator++;//找到与timeList时间对应的网格所在位置,iterator 代表在这两个list中的指针						
+					}				
+					//System.out.println(host+" number "+cell.getNumber()[0]+cell.getNumber()[1]+cell.getNumber()[2]);
+					//System.out.println(host+" error!!! "+label);
+					assert label : "grid calculation error";
+					
+					this.ginterfaces.put(host.getInterface(1), cell);
+					
+					List<DTNHost> hostList = new ArrayList<DTNHost>();
+					if (cellToHost.containsKey(cell)){
+						hostList = cellToHost.get(cell);	
+					}
+					hostList.add(host);
+					cellToHost.put(cell, hostList);
+				}		
+				cellmap.put(time, cellToHost);
+				gridmap.put(time, ginterfaces);//预测未来time时间里节点和网格之间的对应关系
+				//ginterfaces.clear();//每次清空
+				ginterfaces = new HashMap<NetworkInterface, GridCell>();//每次清空
+				//CreateGrid(cellSize);//包含cells的new和ginterfaces的new
+			}
+		}
+		
+		/**
+		 * GridRouter的更新过程函数
+		 */
+	/*	public void updateGrid(){			
 			ginterfaces.clear();//每次清空
 			Coord location = new Coord(0,0); 	// where is the host
 			double simClock = SimClock.getTime();
@@ -1073,7 +1212,9 @@ public class GridRouter extends ActiveRouter{
 				//CreateGrid(cellSize);//包含cells的new和ginterfaces的new
 			}
 			
-		}
+		}*/
+		
+		
 		public GridCell updateLocation(double time, Coord location, DTNHost host){
 			GridCell cell = cellFromCoord(location);
 			//cell.addInterface(host.getInterface(1));

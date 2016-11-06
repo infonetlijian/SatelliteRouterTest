@@ -38,8 +38,8 @@ public class Neighbors {
 	private double updateInterval = 1;
 	
 	public List<DTNHost> getNeighbors(DTNHost host, double time){
-		//int num = (int)((time-SimClock.getTime())/updateInterval);
-		//time = SimClock.getTime()+num*updateInterval;
+		int num = (int)((time-SimClock.getTime())/updateInterval);
+		time = SimClock.getTime()+num*updateInterval;
 		
 		List<DTNHost> neiHost = new ArrayList<DTNHost>();//аз╬сап╠М
 		

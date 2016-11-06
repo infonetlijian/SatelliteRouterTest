@@ -94,6 +94,15 @@ public class SatelliteOrbit implements Printable {
       //  System.out.println("coordinate "+ satellitecoordinate[0][0]);
         return this.satellitecoordinate;
 	}
+	/**
+	 * 返回轨道的周期
+	 * @return
+	 */
+	public double getPeriod(){
+		TwoBody tb = new TwoBody(a,e,i,raan,w,ta);
+		double period = tb.period();
+		return period;
+	}
 
 /*	public void make_plot() {
 		// create your PlotPanel (you can use it as a JPanel) with a legend at
