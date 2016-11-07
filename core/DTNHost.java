@@ -13,6 +13,7 @@ import java.util.Random;
 
 import movement.MovementModel;
 import movement.Path;
+import routing.GridRouter;
 import routing.MessageRouter;
 import routing.util.RoutingInfo;
 
@@ -618,6 +619,16 @@ public class DTNHost implements Comparable<DTNHost> {
 	public List<DTNHost> getHostsList(){
 		List<DTNHost> totalhosts = new ArrayList<DTNHost>();
 		totalhosts = this.hosts;
-		return this.hosts;//totalhosts;
+		return totalhosts;
+	}
+	/**
+	 * 当选用gridRouter时，需要进行初始化操作，即提前计算所有轨道信息
+	 */
+	public void initialzationRouter(){
+		Settings s = new Settings(GROUP_NS);
+		String routerType = s.getSetting("router");//总节点数
+		if (routerType.contains("GridRouter")){
+			((GridRouter)this.router).initialzation();
+		}
 	}
 }

@@ -80,14 +80,18 @@ public class GridRouter extends ActiveRouter{
 		return new GridRouter(this);
 	}
 	/**
+	 * 执行路由的初始化操作
+	 */
+	public void initialzation(){
+		GN.setHost(this.getHost());//为了实现GN和Router以及Host之间的绑定，待修改！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
+		this.GN.initializeGridLocation();
+	}	
+	/**
 	 * 路由更新，每次调用路由更新时的主入口
 	 */
 	@Override
 	public void update() {
 		super.update();
-		
-		//if (GN.getHost() == null)
-		GN.setHost(this.getHost());//为了实现GN和Router以及Host之间的绑定，待修改！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 		
 		/*测试代码，保证neighbors和connections的一致性*/
 		List<DTNHost> conNeighbors = new ArrayList<DTNHost>();
@@ -335,7 +339,7 @@ public class GridRouter extends ActiveRouter{
 		}
 		//GridNeighbors GN = this.getHost().getGridNeighbors();
 		Settings s = new Settings(GROUPNAME_S);
-		int option = s.getInt("withoutorwithOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
+		int option = s.getInt("without_or_withOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
 		
 		switch (option){
 		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
@@ -811,7 +815,7 @@ public class GridRouter extends ActiveRouter{
 			for (DTNHost h : this.host.getHostsList()){//對每個節點遍歷一個週期，記錄其一個週期內遍歷過的網格，并找到對應的進入和離開時間
 				double period = getPeriodofOrbit(h);
 				this.periodMap.put(h, period);
-				System.out.println(h+"  "+period);
+				System.out.println(this.host+" now calculate "+h+"  "+period);
 				
 				List<GridCell> gridList = new ArrayList<GridCell>();
 				List<Double> intoTime = new ArrayList<Double>();

@@ -452,7 +452,8 @@ public class SimScenario implements Serializable {
 				}
 				for (DTNHost host : this.hosts){//新增，传入全局列表参数
 					host.changeHostsList(hosts);
-				}
+					host.initialzationRouter();
+				}		
 				break;//退出
 			default:
 				assert false : "the setting of hostsMode error!";
