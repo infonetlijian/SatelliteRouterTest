@@ -627,8 +627,15 @@ public class DTNHost implements Comparable<DTNHost> {
 	public void initialzationRouter(){
 		Settings s = new Settings(GROUP_NS);
 		String routerType = s.getSetting("router");//总节点数
-		if (routerType.contains("GridRouter")){
+		int option = s.getInt("without_or_withOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
+		
+		switch (option){
+		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
 			((GridRouter)this.router).initialzation();
+			break;
+		case 2:		
+			break;
 		}
+
 	}
 }

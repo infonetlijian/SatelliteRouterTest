@@ -47,8 +47,6 @@ public class EASRRouter extends ActiveRouter{
 	
 	HashMap<DTNHost, Double> arrivalTime = new HashMap<DTNHost, Double>();
 	private HashMap<DTNHost, List<Tuple<Integer, Boolean>>> routerTable = new HashMap<DTNHost, List<Tuple<Integer, Boolean>>>();//节点的路由表
-	private HashMap<DTNHost, Double> helloInterval =new HashMap<DTNHost, Double>();
-	private HashMap<Integer, Double> waitLabel = new HashMap<Integer, Double>();//用于预测邻居的等待时间表，Integer标示节点地址，Double标示等待到达的时间
 	private HashMap<String, Double> busyLabel = new HashMap<String, Double>();//指示下一跳节点处于忙的状态，需要等待
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> neighborsList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();//新增全局其它节点邻居链路生存时间信息
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> predictList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();
@@ -289,17 +287,6 @@ public class EASRRouter extends ActiveRouter{
 		
 		this.routerTable.clear();
 		PathSearch(msg);
-		
-		/*System.out.println(this.getHost() + "  " +SimClock.getTime()+ "  " + this.routerTable);
-		for (int i = 0; i < 10; i++){
-			System.out.print(this.transmitDelay[i]+"  ");
-		}
-		System.out.println("");
-		
-		for (int i = 0; i < 10; i++){
-			System.out.print(this.endTime[i]+"  ");
-		}
-		System.out.println("");*/
 		
 		//updatePredictionRouter(msg);//需要进行预测
 		if (this.routerTable.containsKey(msg.getTo())){//预测也找不到到达目的节点的路径，则路由失败

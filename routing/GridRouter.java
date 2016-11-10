@@ -46,14 +46,11 @@ public class GridRouter extends ActiveRouter{
 	
 	HashMap<DTNHost, Double> arrivalTime = new HashMap<DTNHost, Double>();
 	private HashMap<DTNHost, List<Tuple<Integer, Boolean>>> routerTable = new HashMap<DTNHost, List<Tuple<Integer, Boolean>>>();//节点的路由表
-	private HashMap<DTNHost, Double> helloInterval =new HashMap<DTNHost, Double>();
-	private HashMap<Integer, Double> waitLabel = new HashMap<Integer, Double>();//用于预测邻居的等待时间表，Integer标示节点地址，Double标示等待到达的时间
 	private HashMap<String, Double> busyLabel = new HashMap<String, Double>();//指示下一跳节点处于忙的状态，需要等待
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> neighborsList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();//新增全局其它节点邻居链路生存时间信息
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> predictList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();
 	
 	private boolean routerTableUpdateLabel;
-	private List<DTNHost> totalhosts;
 	private GridNeighbors GN;
 	Random random = new Random();
 	/**
@@ -422,10 +419,16 @@ public class GridRouter extends ActiveRouter{
 						path.addAll(this.routerTable.get(host));
 					Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), predictLable);
 					path.add(hop);//注意顺序
-					/*待修改，应该是leavetime的检查*/
-					if (time > SimClock.getTime() + msgTtl*60)
-						continue;
-					/*待修改，应该是leavetime的检查*/
+					/*待修改，应该是leavetime的检查!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+					if (leaveTime.isEmpty()){
+						if (time > SimClock.getTime() + msgTtl*60)
+							continue;
+					}
+					else{
+						if (time > leaveTime.get(neiHost).get(0))
+							continue;
+					}
+					/*待修改，应该是leavetime的检查!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 					if (time <= minTime){
 						if (random.nextBoolean() == true && time - minTime < 1){
 							minTime = time;
@@ -712,9 +715,6 @@ public class GridRouter extends ActiveRouter{
 		String msgId = con.getMessage().getId();
 		removeFromMessages(msgId);
 	}
-	public void setTotalHosts(List<DTNHost> hosts){
-		this.totalhosts=hosts;
-	}
 	
 	public class GridNeighbors {
 		
@@ -888,9 +888,12 @@ public class GridRouter extends ActiveRouter{
 				startTime.put(neiHost, t);//添加已存在邻居节点的开始时间
 			}
 			
-			List<DTNHost> futureList = new ArrayList<DTNHost>();//(邻居网格内的节点集合)
+			List<DTNHost> futureList = new ArrayList<DTNHost>();//(邻居网格内的未来节点集合)
 			List<NetworkInterface> futureNeiList = new ArrayList<NetworkInterface>();//(预测未来邻居的节点集合)
 			
+			
+			Collection<DTNHost> temporalNeighborsBefore = startTime.keySet();//前一时刻的邻居，通过交叉对比这一时刻的邻居，就知道哪些是新加入的，哪些是新离开的			
+			Collection<DTNHost> temporalNeighborsNow = new ArrayList<DTNHost>();//用于记录当前时刻的邻居
 			for (; time < SimClock.getTime() + msgTtl*60; time += updateInterval){
 				
 				HashMap<NetworkInterface, GridCell> ginterfaces = gridmap.get(time);//取出time时刻的网格表
@@ -902,14 +905,22 @@ public class GridRouter extends ActiveRouter{
 				for (GridCell c : cellList){	//遍历在不同时间维度上，指定节点周围网格的邻居
 					if (!cellmap.get(time).containsKey(c))
 						continue;
+					temporalNeighborsNow.addAll(cellmap.get(time).get(c));
 					for (DTNHost ni : cellmap.get(time).get(c)){//检查当前预测时间点，所有的邻居节点
 						if (ni == this.host)//排除自身节点
 							continue;
 						if (!neiList.contains(ni))//如果现有邻居中没有，则一定是未来将到达的邻居					
 							futureList.add(ni); //此为未来将会到达的邻居(当然对于当前已有的邻居，也可能会中途离开，然后再回来)
-						
+										
 						/**如果是未来到达的邻居，直接get会返回空指针，所以要先加startTime和leaveTime判断**/
 						if (startTime.containsKey(ni)){
+							if (leaveTime.isEmpty())
+								break;
+							if (startTime.get(ni).size() == leaveTime.get(ni).size()){//如果不相等则一定是邻居节点离开的情况					
+								List<Double> mutipleTime= leaveTime.get(ni);
+								mutipleTime.add(time);
+								startTime.put(ni, mutipleTime);//将此新的开始时间加入
+							}
 							/*if (leaveTime.containsKey(ni)){//有两种情况，一种在预测时间段内此邻居会离开，另一种情况是此邻居不仅在此时间段内会离开还会回来
 								if (startTime.get(ni).size() == leaveTime.get(ni).size()){//如果不相等则一定是邻居节点离开的情况					
 									List<Double> mutipleTime= leaveTime.get(ni);
@@ -937,6 +948,17 @@ public class GridRouter extends ActiveRouter{
 						/**如果是未来到达的邻居，直接get会返回空指针，所以要先加startTime和leaveTime判断**/
 					}	
 				}
+				
+				for (DTNHost h : temporalNeighborsBefore){//交叉对比这一时刻和上一时刻的邻居节点，从而找出离开的邻居节点
+					if (!temporalNeighborsNow.contains(h)){
+						List<Double> mutipleTime= leaveTime.get(h);
+						mutipleTime.add(time);
+						leaveTime.put(h, mutipleTime);//将此新的离开时间加入
+					}						
+				}
+				temporalNeighborsBefore.clear();
+				temporalNeighborsBefore = temporalNeighborsNow;
+				temporalNeighborsNow.clear();	
 			}
 			
 			Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime= //二元组合并开始和结束时间
@@ -1153,7 +1175,7 @@ public class GridRouter extends ActiveRouter{
 				initializeGridLocation();
 			
 			ginterfaces.clear();//每次清空
-			Coord location = new Coord(0,0); 	// where is the host
+			//Coord location = new Coord(0,0); 	// where is the host
 			double simClock = SimClock.getTime();
 			
 			for (double time = simClock; time <= simClock + msgTtl*60; time += updateInterval){
