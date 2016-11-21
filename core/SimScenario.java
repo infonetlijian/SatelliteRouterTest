@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 import movement.MapBasedMovement;
@@ -346,13 +347,17 @@ public class SimScenario implements Serializable {
 	}
 	
 	/**
-	 * Creates hosts for the scenario
+	 * 生成指定分组属性的节点，生成的节点数量由调用程序给定
+	 * @param nrof_Hosts
+	 * @param serialnumberofGroups
+	 * @return
 	 */
-	protected void createHosts() {
-		this.hosts = new ArrayList<DTNHost>();
-
-		for (int i=1; i<=nrofGroups; i++) {
-			List<NetworkInterface> interfaces = 
+	protected List<DTNHost> createInitialHosts(int nrof_Hosts, int serialnumberofGroups, String typeofSatellites){
+		List<DTNHost> hostsinthisCreation = new ArrayList<DTNHost>();
+		
+		int i = serialnumberofGroups;
+	
+		List<NetworkInterface> interfaces = 
 				new ArrayList<NetworkInterface>();
 			Settings s = new Settings(GROUP_NS+i);
 			s.setSecondaryNamespace(GROUP_NS);
@@ -419,8 +424,7 @@ public class SimScenario implements Serializable {
 				this.simMap = ((MapBasedMovement)mmProto).getMap();
 			}
 			
-			/*修改*/
-			/*新增参数*/
+			/*修改*/	
 			Settings setting = new Settings(USERSETTINGNAME_S);//读取设置，判断是否需要分簇
 			String string = setting.getSetting(HOSTSMODENAME_S);
 			
@@ -428,41 +432,126 @@ public class SimScenario implements Serializable {
 			int TOTAL_SATELLITES = sat.getInt(NROF_HOSTS_S);//总节点数
 			int TOTAL_PLANE = setting.getInt(NROFPLANE_S);//轨道平面数
 			int NROF_S_EACHPLANE = TOTAL_SATELLITES/TOTAL_PLANE;//每个轨道平面上的节点数
-						
-			switch(string){
-			case CLUSTER_S:
-				;
-			case NORMAL_S:
-				// creates hosts of ith group
-				for (int j=0; j<nrofHosts; j++) {
-					ModuleCommunicationBus comBus = new ModuleCommunicationBus();
+			
+			// creates hosts of ith group
+			for (int j=0; j<nrof_Hosts; j++) {			
+				ModuleCommunicationBus comBus = new ModuleCommunicationBus();
 
-					// prototypes are given to new DTNHost which replicates
-					// new instances of movement model and message router
-					DTNHost host = new DTNHost(this.messageListeners, 
-							this.movementListeners,	gid, interfaces, comBus, 
-							mmProto, mRouterProto);
-					
-					int nrofPlane = j/NROF_S_EACHPLANE + 1;
-					int nrofSatelliteINPlane = j - (nrofPlane - 1) * NROF_S_EACHPLANE;
+				// prototypes are given to new DTNHost which replicates
+				// new instances of movement model and message router
+				DTNHost host = new DTNHost(this.messageListeners, 
+						this.movementListeners,	gid, interfaces, comBus, 
+						mmProto, mRouterProto);
+
+				int nrofPlane = j/NROF_S_EACHPLANE + 1;
+				int nrofSatelliteINPlane = j - (nrofPlane - 1) * NROF_S_EACHPLANE;
+				
+				if (typeofSatellites == "LEO")
 					host.setSatelliteParameters(TOTAL_SATELLITES, TOTAL_PLANE, nrofPlane,
-							nrofSatelliteINPlane, initSatelliteParameters(j, TOTAL_SATELLITES, TOTAL_PLANE));
-					
-					hosts.add(host);			
+						nrofSatelliteINPlane, initialSatelliteParameters(j, TOTAL_SATELLITES, TOTAL_PLANE));
+				else{
+					if (typeofSatellites == "MEO")				
+						host.setSatelliteParameters(TOTAL_SATELLITES, TOTAL_PLANE, nrofPlane,
+								nrofSatelliteINPlane, initialMEOParameters(j, TOTAL_SATELLITES, TOTAL_PLANE));
 				}
-				for (DTNHost host : this.hosts){//新增，传入全局列表参数
-					host.changeHostsList(hosts);
-					host.initialzationRouter();
-				}		
-				break;//退出
-			default:
-				assert false : "the setting of hostsMode error!";
-			}			
+				
+				hostsinthisCreation.add(host);
+				this.hosts.add(host);			
+			}		
+		return hostsinthisCreation;
+	}
+	/**
+	 * Creates hosts for the scenario
+	 */
+	protected void createHosts() {
+		this.hosts = new ArrayList<DTNHost>();
+		/*修改*/
+		/*新增参数*/
+		Settings setting = new Settings(USERSETTINGNAME_S);//读取设置，判断是否需要分簇
+		String string = setting.getSetting(HOSTSMODENAME_S);
+		int nrofMEO = setting.getInt("nrofMEO");
+		
+		Map<String,Integer> mode=new HashMap<String, Integer>();//通过map解决switch case不支持string类型的情况(JAVA 1.7以下不支持) 
+		mode.put("normal", 1);
+		mode.put("cluster", 2);
+		
+		switch(mode.get(string)){
+		case 1:{//normal
+			for (int i = 1; i <= nrofGroups; i++){
+				Settings s = new Settings(GROUP_NS);
+				int nrofHosts = s.getInt(NROF_HOSTS_S);
+				
+				List<DTNHost> hosts = new ArrayList<DTNHost>();
+				hosts.addAll(createInitialHosts(nrofHosts, 1, "LEO"));//初始化生成指定数量的节点
+				//全局节点列表this.hosts在函数createInitialHosts()内已经更新过
+			}		
+			for (DTNHost host : this.hosts){//新增，传入全局列表参数
+				host.changeHostsList(hosts);
+				host.initialzationRouter();
+			}
+			break;
+		}
+		case 2:{//cluster, 分簇路由--针对大规模节点		
+			Settings sat = new Settings(GROUP_NS);
+			int TOTAL_SATELLITES = sat.getInt(NROF_HOSTS_S);//总节点数
+			int TOTAL_PLANE = setting.getInt(NROFPLANE_S);//轨道平面数
+			int NROF_S_EACHPLANE = TOTAL_SATELLITES/TOTAL_PLANE;//每个轨道平面上的节点数
+			
+					
+			/**1.首先生成MEO管理节点**/
+			/**注意，如果是指定分簇的话，group序列号为1的节点设置一定属于MEO管理节点**/
+			List<DTNHost> hostsinMEO = new ArrayList<DTNHost>();
+			hostsinMEO.addAll(createInitialHosts(nrofMEO, 1, "MEO"));//初始化生成指定数量的节点
+			for (DTNHost host : hostsinMEO){
+				host.changeHostsinMEO(hostsinMEO);//传入MEO管理节点列表
+			}
+			
+			/**2.之后生成分簇的LEO节点,用nrofGroups的数量标示分簇的数量**/
+			/**注意，如果是指定分簇的话，group序列号为1的节点设置一定属于MEO管理节点，从2开始的group才是普通低轨卫星LEO节点**/
+			Settings s = new Settings(GROUP_NS);
+			int nrofHosts = s.getInt(NROF_HOSTS_S);//指定数量的LEO节点
+			
+			HashMap<Integer, List<DTNHost>> hostsinEachPlane = new HashMap<Integer, List<DTNHost>>();/*找出各个轨道平面上的节点*/
+			
+			for (int i = 1; i <= nrofGroups; i++){
+				List<DTNHost> hosts = new ArrayList<DTNHost>();
+				hosts.addAll(createInitialHosts(nrofHosts, 1, "LEO"));//初始化生成指定数量的LEO节点
+				//全局节点列表this.hosts在函数createInitialHosts()内已经更新过
+				
+				/*找出各个轨道平面上的节点*/
+				
+				for (int j = 1; j <= TOTAL_PLANE; j++){
+					List<DTNHost> hostsinthePlane = new ArrayList<DTNHost>();
+					for (DTNHost h : hosts){//从所有的LEO节点当中，根据轨道平面的不同进行分类
+						if (h.getNrofPlane() == j){
+							hostsinthePlane.add(h);
+							h.changeClusterNumber(j);
+						}
+					}
+					hostsinEachPlane.put(j, hostsinthePlane);//保存在第j个轨道平面上的节点列表
+				}
+				/*找出各个轨道平面上的节点,并在后续把各个簇内的节点列表存到簇内节点当中*/
+								
+				for (DTNHost host : hosts){					
+					host.changeHostsinCluster(hostsinEachPlane.get(host.getNrofPlane()));//传入本簇内的节点列表
+					host.changeHostsinMEO(hostsinMEO);//传入MEO管理节点列表
+				}
+			}	
+			
+			for (DTNHost host : this.hosts){//无论是MEO或是LEO都传入全局节点列表参数
+				host.changeHostsClusterList(hostsinEachPlane);//传入所有簇的节点列表
+				host.changeHostsList(hosts);
+				host.initialzationRouter();
+			}
+			break;
+		}
+
+		default:
+			assert false : "the setting of userSetting.hostsMode error!";
 		}
 	}
-
 	
-	public double[] initSatelliteParameters(int m, int NROF_SATELLITES, int NROF_PLANE){
+	public double[] initialSatelliteParameters(int m, int NROF_SATELLITES, int NROF_PLANE){
 		
 		double[] parameters = new double[6];
 		/*新增参数*/
@@ -489,6 +578,31 @@ public class SimScenario implements Serializable {
 		
 		return parameters;
 	}
-
+	public double[] initialMEOParameters(int m, int NROF_SATELLITES, int NROF_PLANE){
+		double[] parameters = new double[6];
+		/*新增参数*/
+		//Settings s = new Settings(GROUP_NS);
+		//int NROF_SATELLITES = s.getInt(NROF_HOSTS_S);//总节点数
+		//int NROF_PLANE = 3;//轨道平面数
+		int NROF_S_EACHPLANE = NROF_SATELLITES/NROF_PLANE;//每个轨道平面上的节点数
+		
+		Random random = new Random();
+		//parameters[0]= random.nextInt(9000)%(2000+1) + 2000;
+		parameters[0]= 40000;
+		//this.parameters[0]=8000.0;
+		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
+		parameters[2]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);
+		//parameters[2] = random.nextInt(15);
+		//parameters[3] = random.nextInt(15);
+		parameters[3]= (360/NROF_S_EACHPLANE)*((m-(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE) - 1) + (360/NROF_SATELLITES)*(m/NROF_S_EACHPLANE);//0.0;
+		parameters[4]= 0.0;//0.0;
+		parameters[5]= 0.0;//0.0;
+		
+		System.out.println(m);
+		//nrofPlane = m/NROF_S_EACHPLANE + 1;//卫星所属轨道平面编号
+		//nrofSatelliteINPlane = m - (nrofPlane - 1) * NROF_S_EACHPLANE;//卫星在轨道平面内的编号
+		
+		return parameters;
+	}
 	
 }

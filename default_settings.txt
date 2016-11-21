@@ -8,8 +8,12 @@ userSetting.routerMode = 1
 #simpleConnectivity;
 #userSetting.routerMode = 2
 #userSetting.hostsMode = cluster
-userSetting.hostsMode = normal
+userSetting.hostsMode = cluster
 userSetting.nrofPlane = 3
+userSetting.nrofMEO = 3
+
+# Define 6 different node groups
+Scenario.nrofHostGroups = 1
 
 ## Scenario settings
 Scenario.name = satellite network simulation
@@ -33,8 +37,7 @@ Interface.type = SimpleSatelliteInterface
 Interface.transmitSpeed = 100k
 Interface.transmitRange = 40000
 
-# Define 6 different node groups
-Scenario.nrofHostGroups = 1
+
 
 ## Group-specific settings:
 # groupID : Group's identifier. Used as the prefix of host names
@@ -70,10 +73,11 @@ Group.sendQueue = 1
 #Group.router = FirstContactRouter
 #Group.router = DirectDeliveryRouter
 #Group.router = EpidemicRouter
-Group.router = GridRouter
+#Group.router = GridRouter
 Group.layer = 2
 Group.without_or_withOrbitCalculation = 2
 #Group.router = EASRRouter
+Group.router = ClusterRouterBasedonGridRouter
 #Group.router = DijsktraRouter
 Group.msgPathLabel = true
 Group.bufferSize = 100M
@@ -87,7 +91,7 @@ Group.speed = 0.5, 1.5
 Group.msgTtl = 30
 
 #Group.nrofHosts = [10;20;30;40;50]
-Group.nrofHosts = 18
+Group.nrofHosts = 30
 # group1 (pedestrians) specific settings
 Group1.groupID = Node
 
@@ -102,13 +106,13 @@ Events1.class = MessageEventGenerator
 # (following settings are specific for the MessageEventGenerator class)
 # Creation interval in seconds (one new message every 25 to 35 seconds)
 #Events1.interval = 1,100
-Events1.interval = 10,20
+Events1.interval = 1,100
 # Message sizes (500kB - 1MB)
 
 Events1.size = 100k,1M
 # range of message source/destination addresses
 #Events1.hosts = [0,9;0,19;0,29;0,39;0,49]修改，注意hosts和tohosts包括下界但不包括上界，即[0, 9)
-Events1.hosts = [0,18]
+Events1.hosts = [0,30]
 # Message ID prefix
 Events1.prefix = M
 
@@ -117,7 +121,7 @@ Events1.prefix = M
 # seed for movement models' pseudo random number generator (default = 0)
 MovementModel.rngSeed = 1
 # World's size for Movement Models without implicit size (width, height; meters)
-MovementModel.worldSize = 80000, 80000
+MovementModel.worldSize = 100000, 100000
 # How long time to move hosts in the world before real simulation
 MovementModel.warmup = 1000
 

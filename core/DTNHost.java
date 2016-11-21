@@ -8,6 +8,7 @@ import jat.orbit.SatelliteOrbit;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -53,11 +54,16 @@ public class DTNHost implements Comparable<DTNHost> {
 	//private static final int NROF_S_EACHPLANE = NROF_SATELLITES/NROF_PLANE;//每个轨道平面上的节点数
 	
 	private List<DTNHost> hosts = new ArrayList<DTNHost>();//全局卫星节点列表
+	private List<DTNHost> hostsinCluster = new ArrayList<DTNHost>();//同一个簇内的节点列表
+	private List<DTNHost> hostsinMEO = new ArrayList<DTNHost>();//管理卫星的节点列表
 	
 	private int totalSatellites;//总节点数
 	private int totalPlane;//总平面数
 	private int nrofPlane;//卫星所属轨道平面编号
 	private int nrofSatelliteINPlane;//卫星在轨道平面内的编号
+	private int ClusterNumber;//代表本节点所归属的簇序号
+	
+	private HashMap<Integer, List<DTNHost>> ClusterList = new HashMap<Integer, List<DTNHost>>();
 	/*修改参数部分!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 	
 	static {
@@ -558,6 +564,41 @@ public class DTNHost implements Comparable<DTNHost> {
 		this.location.my_Test(0.0,0.0,this.parameters);//修改节点的初始化位置函数,获取t=0时刻的位置
 	}
 	/**
+	 * 初始化时，改变本节点所在的簇序号
+	 * @param num
+	 */
+	public void changeClusterNumber(int num){
+		this.ClusterNumber = num;
+	}
+	/**
+	 * 读取本节点所在的簇序号
+	 * @return
+	 */
+	public int getClusterNumber(){
+		return this.ClusterNumber;
+	}
+	/**
+	 * 返回全局各个簇内对应的节点列表
+	 * @return
+	 */
+	public HashMap<Integer, List<DTNHost>> getClusterList(){
+		return this.ClusterList;
+	}
+	/**
+	 * 返回本簇内的节点列表
+	 * @return
+	 */
+	public List<DTNHost> getHostsinthisCluster(){
+		return this.hostsinCluster;
+	}
+	/**
+	 * 返回MEO管理卫星节点的列表
+	 * @return
+	 */
+	public List<DTNHost> getMEOList(){
+		return this.hostsinMEO;
+	}
+	/**
 	 * 返回卫星所属轨道平面编号参数
 	 */
 	public int getNrofPlane(){
@@ -607,11 +648,32 @@ public class DTNHost implements Comparable<DTNHost> {
 	public double[] getParameters(){
 		return this.parameters;
 	}
+	public void changeHostsClusterList(HashMap<Integer, List<DTNHost>> hostsinEachPlane){
+		this.ClusterList = hostsinEachPlane;
+	}
+	/**
+	 * 改变全局节点列表
+	 * @param hosts
+	 */
 	public void changeHostsList(List<DTNHost> hosts){
 		 this.nei.changeHostsList(hosts);
 		 //this.GN.setHostsList(hosts);
 		 //this.router.setTotalHosts(hosts);
 		 this.hosts = hosts;
+	}
+	/**
+	 * 改变本簇内节点列表，初始化用
+	 * @param hostsinCluster
+	 */
+	public void changeHostsinCluster(List<DTNHost> hostsinCluster){
+		this.hostsinCluster = hostsinCluster;
+	}
+	/**
+	 * 改变MEO管理节点列表，初始化用
+	 * @param hostsinMEO
+	 */
+	public void changeHostsinMEO(List<DTNHost> hostsinMEO){
+		this.hostsinMEO = hostsinMEO;
 	}
 	public void updateLocation(double timeNow){
 		this.location.my_Test(0.0,timeNow,this.parameters);//修改节点的位置,获取timeNow时刻的位置
