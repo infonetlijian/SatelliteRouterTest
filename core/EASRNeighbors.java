@@ -1,3 +1,7 @@
+/* 
+ * Copyright 2016 University of Science and Technology of China , Infonet
+ * Written by LiJian.
+ */
 package core;
 
 import java.util.ArrayList;

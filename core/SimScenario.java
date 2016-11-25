@@ -471,9 +471,11 @@ public class SimScenario implements Serializable {
 		String string = setting.getSetting(HOSTSMODENAME_S);
 		int nrofMEO = setting.getInt("nrofMEO");
 		
-		Map<String,Integer> mode=new HashMap<String, Integer>();//通过map解决switch case不支持string类型的情况(JAVA 1.7以下不支持) 
+		/**通过map解决switch case不支持string类型的情况(JAVA 1.7以下不支持)**/
+		Map<String,Integer> mode=new HashMap<String, Integer>();
 		mode.put("normal", 1);
 		mode.put("cluster", 2);
+		/**通过map解决switch case不支持string类型的情况(JAVA 1.7以下不支持)**/
 		
 		switch(mode.get(string)){
 		case 1:{//normal

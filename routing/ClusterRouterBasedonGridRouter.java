@@ -1,3 +1,7 @@
+/* 
+ * Copyright 2016 University of Science and Technology of China , Infonet
+ * Written by LiJian.
+ */
 package routing;
 
 import java.util.ArrayList;
@@ -7,6 +11,7 @@ import java.util.List;
 import java.util.Random;
 
 import movement.MovementModel;
+import movement.SatelliteMovement;
 import util.Tuple;
 import core.Connection;
 import core.Coord;
@@ -353,9 +358,13 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 		}
 		//GridNeighbors GN = this.getHost().getGridNeighbors();
 		Settings s = new Settings(GROUPNAME_S);
-		int option = s.getInt("without_or_withOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
+		String option = s.getSetting("Pre_or_onlineOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
 		
-		switch (option){
+		HashMap<String, Integer> orbitCalculationWay = new HashMap<String, Integer>();
+		orbitCalculationWay.put("preOrbitCalculation", 1);
+		orbitCalculationWay.put("onlineOrbitCalculation", 2);
+		
+		switch (orbitCalculationWay.get(option)){
 		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
 			GN.updateGrid_without_OrbitCalculation();//更新网格表
 			break;
@@ -1293,6 +1302,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 			for (double time = simClock; time <= simClock + msgTtl*60; time += updateInterval){
 				HashMap<GridCell, List<DTNHost>> cellToHost= new HashMap<GridCell, List<DTNHost>>();
 				for (DTNHost host : hosts){
+					//location.setLocation3D(((SatelliteMovement)host.getMovementModel()).getSatelliteCoordinate(time));//用satellitemovement替换location。my_test，待测试
 					location.my_Test(time, 0, host.getParameters());
 					
 					GridCell cell = updateLocation(time, location, host);//更新在指定时间节点和网格的归属关系

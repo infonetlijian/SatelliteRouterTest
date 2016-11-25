@@ -195,31 +195,7 @@ public class World {
 			ul.updated(this.hosts);
 		}
 	}
-	/*test!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
-	public void test(){//网格法优化用
-		LinkedMap<Double, ConnectivityOptimizer> map = new LinkedMap<Double, ConnectivityOptimizer>();
-		double endTime = 60000;
-		List<ConnectivityOptimizer> optList = new ArrayList<ConnectivityOptimizer>();
-		for (double time = 0; time < endTime; time += this.updateInterval){
-			for (int i = 0; i < this.hosts.size(); i++){
-				hosts.get(i).updateLocation(time);//循环遍历更新所有的节点位置
-			}
-			hosts.get(0).getInterface(1).predictionUpdate();
-		}
-		for (double time = 0; time < endTime; time += this.updateInterval){
-			for (int i = 0; i < this.hosts.size(); i++){
-				hosts.get(i).updateLocation(time);//循环遍历更新所有的节点位置
-				for (NetworkInterface inter : hosts.get(i).getInterfaces()){
-					ConnectivityOptimizer conOpt = inter.predictionUpdate();//更新各个节点的网格位置
-					optList.add(conOpt);
-					
-					System.out.println(conOpt.getAllInterfaces());
-				}
-			}			
-		}
 
-	}
-	/*新增函数!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 	public double calculateDistance(Coord c1,Coord c2){
 		double distance = c1.distance(c2);
 		return distance;

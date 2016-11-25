@@ -1,3 +1,7 @@
+/* 
+ * Copyright 2016 University of Science and Technology of China , Infonet
+ * Written by LiJian.
+ */
 package routing;
 
 import java.util.ArrayList;
@@ -301,7 +305,10 @@ public class EASRRouter extends ActiveRouter{
 		//if (!this.getHost().getNeighbors().getNeighbors().isEmpty())//如果本节点不处于孤立状态，则进行邻居节点的路由更新
 		//	;	
 	}
-	
+	/**
+	 * EASR(earliest arrival space routing algorithm)，执行最短路径路由算法
+	 * @param msg
+	 */
 	public void PathSearch(Message msg){
 		Neighbors nei = this.getHost().getNeighbors();
 		/*nei.updateNeighbors(this.getHost(), connections);//更新邻居列表
@@ -664,6 +671,4 @@ public class EASRRouter extends ActiveRouter{
 		String msgId = con.getMessage().getId();
 		removeFromMessages(msgId);
 	}
-	
-
 }

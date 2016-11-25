@@ -8,7 +8,7 @@ userSetting.routerMode = 1
 #simpleConnectivity;
 #userSetting.routerMode = 2
 #userSetting.hostsMode = cluster
-userSetting.hostsMode = cluster
+userSetting.hostsMode = normal
 userSetting.nrofPlane = 3
 userSetting.nrofMEO = 3
 
@@ -61,7 +61,7 @@ Interface.transmitRange = 40000
 
 # Common settings for all groups
 #Group.movementModel = PredictableMovement自己创建的新运动模型，里面函数暂时均没有调用
-Group.movementModel =  PredictableMovement
+Group.movementModel =  SatelliteMovement
 #Group.movementModel =  StationaryMovement
 #Group.nodeLocation=[0,3000; 0,2000]
 
@@ -73,11 +73,12 @@ Group.sendQueue = 1
 #Group.router = FirstContactRouter
 #Group.router = DirectDeliveryRouter
 #Group.router = EpidemicRouter
-#Group.router = GridRouter
+Group.router = GridRouter
 Group.layer = 2
-Group.without_or_withOrbitCalculation = 2
+#Group.Pre_or_onlineOrbitCalculation = preOrbitCalculation
+Group.Pre_or_onlineOrbitCalculation = onlineOrbitCalculation
 #Group.router = EASRRouter
-Group.router = ClusterRouterBasedonGridRouter
+#Group.router = ClusterRouterBasedonGridRouter
 #Group.router = DijsktraRouter
 Group.msgPathLabel = true
 Group.bufferSize = 100M
@@ -148,6 +149,7 @@ SprayAndWaitRouter.binaryMode = true
 
 ## Optimization settings -- these affect the speed of the simulation
 ## see World class for details.
+#在world.java中的initSettings函数中读取
 Optimization.cellSizeMult = 1
 Optimization.randomizeUpdateOrder = true
 

@@ -14,6 +14,7 @@ import java.util.Random;
 
 import movement.MovementModel;
 import movement.Path;
+import movement.SatelliteMovement;
 import routing.GridRouter;
 import routing.MessageRouter;
 import routing.util.RoutingInfo;
@@ -84,7 +85,7 @@ public class DTNHost implements Comparable<DTNHost> {
 			List<MovementListener> movLs,
 			String groupId, List<NetworkInterface> interf,
 			ModuleCommunicationBus comBus, 
-			MovementModel mmProto, MessageRouter mRouterProto) {//修改，增加walker星座的初始化变量！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
+			MovementModel mmProto, MessageRouter mRouterProto) {
 		this.comBus = comBus;
 		this.location = new Coord(0,0);
 		this.address = getNextAddress();
@@ -536,11 +537,19 @@ public class DTNHost implements Comparable<DTNHost> {
 		double distance;
 		double dx, dy;
 		
-		this.location.my_Test(SimClock.getTime(),timeIncrement,this.parameters);
+		this.location.setLocation3D(((SatelliteMovement)this.movement).getSatelliteCoordinate(SimClock.getTime()));
+		
+		//this.location.my_Test(SimClock.getTime(),timeIncrement,this.parameters);
 		//System.out.println(this+" time: "+SimClock.getTime()+"  "+location);
 		//System.out.println(SimClock.getTime()+"  "+this+"  "+location.getX()+"  "+location.getY()+"  "+location.getZ());
 
 	}	
+	public double[] calculateOrbitCoordinate(double[] parameters, double time){
+		return ((SatelliteMovement)this.movement).calculateOrbitCoordinate(parameters, time);
+	}
+	public MovementModel getMovementModel(){
+		return this.movement;
+	}
 	/*新增函数*/
 	//public GridNeighbors getGridNeighbors(){
 	//	return GN;
@@ -561,6 +570,7 @@ public class DTNHost implements Comparable<DTNHost> {
 		this.nrofPlane = nrofPlane;//卫星所属轨道平面编号
 		this.nrofSatelliteINPlane = nrofSatelliteInPlane;//卫星在轨道平面内的编号
 		
+		((SatelliteMovement)this.movement).setOrbitParameters(parameters);
 		this.location.my_Test(0.0,0.0,this.parameters);//修改节点的初始化位置函数,获取t=0时刻的位置
 	}
 	/**
@@ -689,9 +699,13 @@ public class DTNHost implements Comparable<DTNHost> {
 	public void initialzationRouter(){
 		Settings s = new Settings(GROUP_NS);
 		String routerType = s.getSetting("router");//总节点数
-		int option = s.getInt("without_or_withOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
+		String option = s.getSetting("Pre_or_onlineOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
 		
-		switch (option){
+		HashMap<String, Integer> orbitCalculationWay = new HashMap<String, Integer>();
+		orbitCalculationWay.put("preOrbitCalculation", 1);
+		orbitCalculationWay.put("onlineOrbitCalculation", 2);
+		
+		switch (orbitCalculationWay.get(option)){
 		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
 			((GridRouter)this.router).initialzation();
 			break;
