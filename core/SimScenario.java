@@ -567,11 +567,11 @@ public class SimScenario implements Serializable {
 		parameters[0]= 34000;
 		//this.parameters[0]=8000.0;
 		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
-		parameters[2]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);
+		parameters[2]= 55;
 		//parameters[2] = random.nextInt(15);
 		//parameters[3] = random.nextInt(15);
-		parameters[3]= (360/NROF_S_EACHPLANE)*((m-(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE) - 1) + (360/NROF_SATELLITES)*(m/NROF_S_EACHPLANE);//0.0;
-		parameters[4]= 0.0;//0.0;
+		parameters[3]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);//0.0;
+		parameters[4]= (360/NROF_S_EACHPLANE)*((m-(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE) - 1) + (360/NROF_SATELLITES)*(m/NROF_S_EACHPLANE);//0.0;
 		parameters[5]= 0.0;//0.0;
 		
 		System.out.println(m);
@@ -593,11 +593,11 @@ public class SimScenario implements Serializable {
 		parameters[0]= 40000;
 		//this.parameters[0]=8000.0;
 		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
-		parameters[2]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);
+		parameters[2]= 55;
 		//parameters[2] = random.nextInt(15);
 		//parameters[3] = random.nextInt(15);
-		parameters[3]= (360/NROF_S_EACHPLANE)*((m-(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE) - 1) + (360/NROF_SATELLITES)*(m/NROF_S_EACHPLANE);//0.0;
-		parameters[4]= 0.0;//0.0;
+		parameters[3]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);//0.0;
+		parameters[4]= (360/NROF_S_EACHPLANE)*((m-(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE) - 1) + (360/NROF_SATELLITES)*(m/NROF_S_EACHPLANE);//0.0;
 		parameters[5]= 0.0;//0.0;
 		
 		System.out.println(m);

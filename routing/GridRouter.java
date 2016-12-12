@@ -331,6 +331,10 @@ public class GridRouter extends ActiveRouter{
 		//	;	
 	}
 	
+	/**
+	 * 核心路由算法，运用贪心选择性质进行遍历，找出到达目的节点的最短路径
+	 * @param msg
+	 */
 	public void gridSearch(Message msg){
 		if (routerTableUpdateLabel == true)//routerTableUpdateLabel == true则代表此次更新路由表已经更新过了，所以不要重复计算
 			return;

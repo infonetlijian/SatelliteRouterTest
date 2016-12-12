@@ -222,11 +222,21 @@ public class Coord implements Cloneable, Comparable<Coord> {
 				this.z = (coordinate[0][2]+40000);
 
 	}
+	/**
+	 * 将Coord类拓展成三维坐标后，通过此函数进行三维坐标设置
+	 * @param x x轴
+	 * @param y y轴
+	 * @param z z轴
+	 */
 	public void resetLocation(double x,double y,double z){//设置三维坐标
 		this.x=x;
 		this.y=y;
 		this.z=z;
 	}
+	/**
+	 * 将Coord类拓展成三维坐标后，通过此函数进行三维坐标设置
+	 * @param x 传入参量为三维坐标的数组形式
+	 */
 	public void setLocation3D(double[] x){
 		this.x=x[0];
 		this.y=x[1];

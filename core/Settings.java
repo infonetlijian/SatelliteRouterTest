@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -252,6 +253,8 @@ public class Settings {
 		try {
 			if (new File(DEF_SETTINGS_FILE).exists()) {
 				Properties defProperties = new Properties();
+				//InputStream in = Settings.class.getClass().getResourceAsStream("/default_settings.txt");
+				//defProperties.load(in);
 				defProperties.load(new FileInputStream(DEF_SETTINGS_FILE));
 				props = new Properties(defProperties);
 			}

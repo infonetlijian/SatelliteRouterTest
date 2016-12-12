@@ -1,8 +1,27 @@
+/** 
+ * Project Name:SatelliteRouterTest 
+ * File Name:ShortestDistanceSpaceRouter.java 
+ * Package Name:routing 
+ * Date:2016年12月10日上午11:12:55 
+ * Copyright (c) 2016, LiJian9@mail.ustc.mail.cn. All Rights Reserved. 
+ * 
+*/  
+  
+package routing;  
+/** 
+ * ClassName:ShortestDistanceSpaceRouter <br/> 
+ * Function: TODO ADD FUNCTION. <br/> 
+ * Reason:   TODO ADD REASON. <br/> 
+ * Date:     2016年12月10日 上午11:12:55 <br/> 
+ * @author   USTC, LiJian
+ * @version   
+ * @since    JDK 1.7 
+ * @see       
+ */
 /* 
  * Copyright 2016 University of Science and Technology of China , Infonet
  * Written by LiJian.
  */
-package routing;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -22,7 +41,7 @@ import core.Settings;
 import core.SimClock;
 import core.SimError;
 
-public class ClusterRouterBasedonGridRouter extends ActiveRouter{
+public class ShortestDistanceSpaceRouter extends ActiveRouter{
 	/**自己定义的变量和映射等
 	 * 
 	 */
@@ -48,6 +67,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 	private boolean msgPathLabel;//此标识指示是否在信息头部中标识路由路径
 	private double	transmitRange;//设置的可通行距离阈值
 	private List<DTNHost> hosts;//全局节点列表
+	private double msgTtl;
 	
 	HashMap<DTNHost, Double> arrivalTime = new HashMap<DTNHost, Double>();
 	private HashMap<DTNHost, List<Tuple<Integer, Boolean>>> routerTable = new HashMap<DTNHost, List<Tuple<Integer, Boolean>>>();//节点的路由表
@@ -57,22 +77,22 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 	
 	private boolean routerTableUpdateLabel;
 	private GridNeighbors GN;
-	
-	DTNHost MEOinthisTime;
 	Random random = new Random();
 	/**
 	 * 初始化
 	 * @param s
 	 */
-	public ClusterRouterBasedonGridRouter(Settings s){
+	public ShortestDistanceSpaceRouter(Settings s){
 		super(s);
 	}
 	/**
 	 * 初始化
 	 * @param r
 	 */
-	protected ClusterRouterBasedonGridRouter(ClusterRouterBasedonGridRouter r) {
+	protected ShortestDistanceSpaceRouter(ShortestDistanceSpaceRouter r) {
 		super(r);
+		Settings s = new Settings("Group");
+		msgTtl = s.getDouble("msgTtl");
 		this.GN = new GridNeighbors(this.getHost());//不放在这的原因是，当执行这一步初始化的时候，host和router还没有完成绑定操作
 	}
 	/**
@@ -81,7 +101,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 	@Override
 	public MessageRouter replicate() {
 		//this.GN = new GridNeighbors(this.getHost());
-		return new ClusterRouterBasedonGridRouter(this);
+		return new ShortestDistanceSpaceRouter(this);
 	}
 	/**
 	 * 执行路由的初始化操作
@@ -241,19 +261,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 		if (updateRouterTable(message) == false){//在传输之前，先更新路由表
 			return null;//若没有返回说明一定找到了对应路径
 		}
-		
-		List<Tuple<Integer, Boolean>> routerPath;
-		if (this.getHost().getMEOList().contains(this.getHost()))//如果是MEO节点，则直接找到目的节点的路径
-			routerPath = this.routerTable.get(message.getTo());
-		else{
-			if (this.getHost().getHostsinthisCluster().contains(message.getTo())){//对于簇内的节点，直接找寻最短路径
-				routerPath = this.routerTable.get(message.getTo());
-			}		
-			else{
-				routerPath = this.routerTable.get(this.MEOinthisTime);//对非簇内的节点，找寻可达的管理节点MEO，由MEO进行转发
-			}
-		}
-
+		List<Tuple<Integer, Boolean>> routerPath = this.routerTable.get(message.getTo());
 		
 		if (msgPathLabel == true){//如果写入路径信息标志位真，就写入路径消息
 			message.updateProperty(MSG_ROUTERPATH, routerPath);
@@ -315,15 +323,11 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 	 * @return
 	 */
 	public boolean updateRouterTable(Message msg){
-		if (this.getHost().getMEOList().contains(this.getHost()))//如果这是一个MEO节点
-			gridSearch(msg, msg.getTo());
-		else{
-			if (this.getHost().getHostsinthisCluster().contains(msg.getTo()))
-				gridSearch(msg, msg.getTo());
-			else
-				gridSearch(msg, null);
-		}
-
+		
+		
+		
+		gridSearch(msg);
+		
 		/*System.out.println(this.getHost() + "  " +SimClock.getTime()+ "  " + this.routerTable);
 		for (int i = 0; i < 10; i++){
 			System.out.print(this.transmitDelay[i]+"  ");
@@ -346,13 +350,14 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 		}
 		
 		//if (!this.getHost().getNeighbors().getNeighbors().isEmpty())//如果本节点不处于孤立状态，则进行邻居节点的路由更新
+		//	;	
 	}
+	
 	/**
-	 * 核心路由算法，运用贪心选择性质进行遍历，找出到达目的节点最短路径；同时根据分簇规定，对于不在同一个簇内的目的节点，转而找寻通往MEO节点的路径，让MEO节点代为转发
+	 * 核心路由算法，运用贪心选择性质进行遍历，找出到达目的节点的最短路径
 	 * @param msg
-	 * @param destinationHost
 	 */
-	public void gridSearch(Message msg, DTNHost destinationHost){
+	public void gridSearch(Message msg){
 		if (routerTableUpdateLabel == true)//routerTableUpdateLabel == true则代表此次更新路由表已经更新过了，所以不要重复计算
 			return;
 		this.routerTable.clear();
@@ -377,55 +382,24 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 			break;
 		}
 		
+		/*添加链路可探测到的一跳邻居，并更新路由表*/
 		List<DTNHost> sourceSet = new ArrayList<DTNHost>();
-		List<DTNHost> availableHosts = new ArrayList<DTNHost>();//创建一个MEO或者是LEO可达的节点集合
-		/**1.如果这是一个MEO节点**/
-		if (this.getHost().getMEOList().contains(this.getHost())){			
-			availableHosts.addAll(this.getHost().getMEOList());
-			availableHosts.addAll(this.getHost().getClusterList().get(msg.getTo().getClusterNumber()));//找到目的节点所在的簇的节点列表，并加入可选转发节点列表中
-			
-			/*添加链路可探测到的一跳邻居，并更新路由表*/
-			sourceSet.add(this.getHost());//初始时只有本节点
-			for (Connection con : this.getHost().getConnections()){//添加链路可探测到的一跳邻居，并更新路由表
-				DTNHost neiHost = con.getOtherNode(this.getHost());
-				if (availableHosts.contains(neiHost)){//只添加在可用节点集合availableHosts中的邻居节点
-					sourceSet.add(neiHost);//初始时只有本节点和链路邻居		
-					Double time = SimClock.getTime() + msg.getSize()/this.getHost().getInterface(1).getTransmitSpeed();
-					List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();
-					Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), false);
-					path.add(hop);//注意顺序
-					arrivalTime.put(neiHost, time);
-					routerTable.put(neiHost, path);
-				}
-			}
-			
-			/*添加链路可探测到的一跳邻居，并更新路由表*/
+		sourceSet.add(this.getHost());//初始时只有本节点
+		
+		for (Connection con : this.getHost().getConnections()){//添加链路可探测到的一跳邻居，并更新路由表
+			DTNHost neiHost = con.getOtherNode(this.getHost());
+			sourceSet.add(neiHost);//初始时只有本节点和链路邻居		
+			Double time = SimClock.getTime() + msg.getSize()/this.getHost().getInterface(1).getTransmitSpeed();
+			List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();
+			Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), false);
+			path.add(hop);//注意顺序
+			arrivalTime.put(neiHost, time);
+			routerTable.put(neiHost, path);
 		}
-		/**2.如果这是一个LEO节点，则只能找寻在本簇内的直达路径，否则，跨簇则交由MEO节点进行转发**/
-		else{	
-			availableHosts.addAll(this.getHost().getMEOList());
-			availableHosts.addAll(this.getHost().getClusterList().get(this.getHost().getClusterNumber()));//找到本节点所在的簇的节点列表，并加入可选转发节点列表中
-			
-			/*添加链路可探测到的一跳邻居，并更新路由表*/
-			sourceSet.add(this.getHost());//初始时只有本节点
-			
-			for (Connection con : this.getHost().getConnections()){//添加链路可探测到的一跳邻居，并更新路由表
-				DTNHost neiHost = con.getOtherNode(this.getHost());
-				if (availableHosts.contains(neiHost)){//只添加在可用节点集合availableHosts中的邻居节点
-					sourceSet.add(neiHost);//初始时只有本节点和链路邻居		
-					Double time = SimClock.getTime() + msg.getSize()/this.getHost().getInterface(1).getTransmitSpeed();
-					List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();
-					Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), false);
-					path.add(hop);//注意顺序
-					arrivalTime.put(neiHost, time);
-					routerTable.put(neiHost, path);
-				}
-			}
-			/*添加链路可探测到的一跳邻居，并更新路由表*/
-			}	
+		/*添加链路可探测到的一跳邻居，并更新路由表*/
 		
 		int iteratorTimes = 0;
-		int size = availableHosts.size();
+		int size = this.hosts.size();
 		double minTime = 100000;
 		DTNHost minHost =null;
 		boolean updateLabel = true;
@@ -434,6 +408,50 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 
 		
 		arrivalTime.put(this.getHost(), SimClock.getTime());//初始化到达时间
+		
+		/*首先搜索是不是一跳的邻居节点，是邻居节点则直接返回*/
+		if (this.routerTable.containsKey(msg.getTo()))
+			return;
+		/*首先搜索是不是一跳的邻居节点，是邻居节点则直接返回*/
+		List<DTNHost> searchedSet = new ArrayList<DTNHost>();
+		searchedSet.add(this.getHost());
+		while(true){
+			double minDistance = 100000;
+			double startTime = SimClock.getTime();
+			double prevTime = 0;//记录前一跳的截止时间
+			for (DTNHost host : sourceSet){
+				double waitTime = 0;
+				if (searchedSet.contains(host))
+					continue;
+				
+				Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime;//邻居节点到达时间和离开时间的二元组组合
+				HashMap<DTNHost, List<Double>> startTime;
+				HashMap<DTNHost, List<Double>> leaveTime;
+				List<DTNHost> neiList = GN.getNeighbors(host, arrivalTime.get(host));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
+				assert neiList == null:"没能成功读取到指定时间的邻居";
+				predictTime = GN.getFutureNeighbors(neiList, host, arrivalTime.get(host));
+				
+				startTime = predictTime.getKey();
+				leaveTime = predictTime.getValue();
+				
+				if (prevTime < startTime.get(host).get(0))
+					waitTime = startTime.get(host).get(0) - prevTime;//如果为真，则为一个未来到达的节点，需要有等待延时
+				double time = prevTime + msg.getSize()/host.getInterface(1).getTransmitSpeed() + waitTime;
+				
+				double distance = GN.calculateDistance(this.getHost(), host, time, time+this.msgTtl);
+				if (distance < minDistance){
+					minDistance = distance;
+					minHost = host;
+					minTime = time;
+				}
+				searchedSet.add(host);//代表已经搜索过的节点				
+			}
+			if (GN.getNeighbors(minHost, minTime).contains(msg.getTo())){
+				break;//找到一条路径就退出
+			}
+			sourceSet = GN.getNeighbors(minHost, minTime);
+		}
+		
 		
 		while(true){//Dijsktra算法思想，每次历遍全局，找时延最小的加入路由表，保证路由表中永远是时延最小的路径
 			if (iteratorTimes >= size || updateLabel == false)
@@ -454,7 +472,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 				}
 				else{
 					List<DTNHost> neiList = GN.getNeighbors(host, arrivalTime.get(host));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
-					assert neiList==null:"没能成功读取到指定时间的邻居";
+					assert neiList == null:"没能成功读取到指定时间的邻居";
 					predictTime = GN.getFutureNeighbors(neiList, host, arrivalTime.get(host));
 				}
 				startTime = predictTime.getKey();
@@ -462,12 +480,6 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 				if (startTime.keySet().isEmpty())
 					continue;
 				for (DTNHost neiHost : startTime.keySet()){//startTime.keySet()包含了所有的邻居节点，包含未来的邻居节点
-					
-					/**如果不是可选范围内的节点，则跳过**/
-					if (!availableHosts.contains(neiHost))
-						continue;
-					/**如果不是可选范围内的节点，则跳过**/
-					
 					if (sourceSet.contains(neiHost))
 						continue;
 					if (arrivalTime.get(host) >= SimClock.getTime() + msgTtl*60)//出发时间就已经超出TTL预测时间的话就直接排除
@@ -512,21 +524,12 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 			}
 			iteratorTimes++;
 			sourceSet.add(minHost);//将新的最短节点加入
-			if (destinationHost == null)//如果destinationHost为空，代表此信息msg的目的节点跨簇了，则转交给MEO，找MEO的路由
-				for (DTNHost MEO : this.getHost().getMEOList()){
-					if (routerTable.containsKey(MEO)){//如果中途任何一个可达的MEO，则直接返回
-						this.MEOinthisTime = MEO;
-						routerTableUpdateLabel = true;
-						return;
-					}					
-				}
-			if (routerTable.containsKey(destinationHost))//如果中途找到需要的路徑，就直接退出搜索
+			if (routerTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
 				break;
 		}
 		routerTableUpdateLabel = true;
 		
-		System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());	
-		
+		System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());
 	}
 	
 
@@ -811,7 +814,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 		private  int worldSizeY;
 		private  int worldSizeZ;//新增
 		
-		private int gridLayer;
+		private int gridLayer;//层数，即决定了网格划分的精细程度
 		
 		private List<GridCell[][][]> GridList = new ArrayList<GridCell[][][]>();
 		private HashMap<Double, HashMap<NetworkInterface, GridCell>> gridmap = new HashMap<Double, HashMap<NetworkInterface, GridCell>>();
@@ -924,7 +927,87 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 		public double getPeriodofOrbit(DTNHost h){
 			return h.getPeriod();
 		}
+		
+		/**
+		 * 计算从开始到结束时间内两个节点之间的距离，距离以网格的离散三维坐标来计算
+		 * @param source
+		 * @param destination
+		 * @param startTime
+		 * @param endTime
+		 * @return
+		 */
+		public double calculateDistance(DTNHost source, DTNHost destination, double startTime, double endTime){		
+			List<GridCell> p1 = gridLocation.get(source);
+			List<GridCell> p2 = gridLocation.get(destination);
+			List<Double> t1 = gridTime.get(source);
+			List<Double> t2 = gridTime.get(destination);
 			
+			int startLocation_1 = findMostCloseValueFromList(t1, startTime);
+			int endLocation_1 = findMostCloseValueFromList(t1, endTime);
+			int startLocation_2 = findMostCloseValueFromList(t2, startTime);
+			int endLocation_2 = findMostCloseValueFromList(t2, endTime);
+			
+			List<GridCell> pathDuringTTL_1 = new ArrayList<GridCell>();		
+			for (int i = startLocation_1; i <= endLocation_1; i++){
+				pathDuringTTL_1.add(p1.get(i));
+			}
+			List<GridCell> pathDuringTTL_2 = new ArrayList<GridCell>();
+			for (int i = startLocation_2; i <= endLocation_2; i++){
+				pathDuringTTL_2.add(p1.get(i));
+			}
+			
+			this
+			//有问题，待修改！！！！！！！！！！！！！！！
+			/*计算各自网格坐标之和*/
+			int sumofGridCoordinate_1 = 0;
+			for(GridCell gc : pathDuringTTL_1){
+				sumofGridCoordinate_1 += gc.getNumber()[0];
+				sumofGridCoordinate_1 += gc.getNumber()[1];
+				sumofGridCoordinate_1 += gc.getNumber()[2];
+			}
+			int sumofGridCoordinate_2 = 0;
+			for(GridCell gc : pathDuringTTL_1){
+				sumofGridCoordinate_2 += gc.getNumber()[0];
+				sumofGridCoordinate_2 += gc.getNumber()[1];
+				sumofGridCoordinate_2 += gc.getNumber()[2];
+			}
+			
+			double distance = Math.abs(sumofGridCoordinate_1 - sumofGridCoordinate_2);
+			
+			return distance;
+		}
+		
+		public int findMostCloseValueFromList(List<Double> t1, double time){
+			double minDifferenceValue = 10000000;
+			int iterator;
+			for (int i = 0; i < t1.size(); i++){
+				double differenceValue = Math.abs(t1.get(i) - Time);
+				if (differenceValue < minDifferenceValue){
+					minDifferenceValue = differenceValue;
+					iterator = i;
+				}
+			}
+			return iterator;
+		}
+		
+		public double transformTimeFormat(double t){
+			double time = t;
+			int num = (int)((time-SimClock.getTime())/updateInterval);
+			time = SimClock.getTime()+num*updateInterval;
+			
+			if (time > SimClock.getTime()+msgTtl*60){//检查输入的时间是否超过预测时间
+				//assert false :"超出预测时间";
+				time = SimClock.getTime()+msgTtl*60;
+			}
+			return time;
+		}
+		
+		/**
+		 * 获取指定时间的邻居节点(同时包含预测到TTL时间内未来到达的邻居)
+		 * @param host
+		 * @param time
+		 * @return
+		 */
 		public List<DTNHost> getNeighbors(DTNHost host, double time){//获取指定时间的邻居节点(同时包含预测到TTL时间内的邻居)
 			int num = (int)((time-SimClock.getTime())/updateInterval);
 			time = SimClock.getTime()+num*updateInterval;
@@ -1306,8 +1389,13 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 			for (double time = simClock; time <= simClock + msgTtl*60; time += updateInterval){
 				HashMap<GridCell, List<DTNHost>> cellToHost= new HashMap<GridCell, List<DTNHost>>();
 				for (DTNHost host : hosts){
-					//location.setLocation3D(((SatelliteMovement)host.getMovementModel()).getSatelliteCoordinate(time));//用satellitemovement替换location。my_test，待测试
-					location.my_Test(time, 0, host.getParameters());
+					
+					/**测试代码**/
+					location.setLocation3D(((SatelliteMovement)host.getMovementModel()).getSatelliteCoordinate(time));
+					//System.out.println(host+"  "+location);
+					/**测试代码**/
+					
+					//location.my_Test(time, 0, host.getParameters());
 					
 					GridCell cell = updateLocation(time, location, host);//更新在指定时间节点和网格的归属关系
 					List<DTNHost> hostList = new ArrayList<DTNHost>();
@@ -1379,3 +1467,5 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 		}
 	}
 }
+
+  

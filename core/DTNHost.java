@@ -1,7 +1,12 @@
-/* 
- * Copyright 2010 Aalto University, ComNet
- * Released under GPLv3. See LICENSE.txt for details. 
- */
+/**
+ * Project Name:SatelliteRouterTest
+ * File Name:DTNHost.java
+ * Package Name:core
+ * Date:2016年11月25日下午8:32:56
+ * Copyright (c) 2016, LiJian9@mail.ustc.edu.cn. All Rights Reserved.
+ *
+ */  
+
 package core;
 
 import jat.orbit.SatelliteOrbit;
@@ -685,9 +690,17 @@ public class DTNHost implements Comparable<DTNHost> {
 	public void changeHostsinMEO(List<DTNHost> hostsinMEO){
 		this.hostsinMEO = hostsinMEO;
 	}
+	/**
+	 * 更新本节点指定时间的位置坐标
+	 * @param timeNow
+	 */
 	public void updateLocation(double timeNow){
 		this.location.my_Test(0.0,timeNow,this.parameters);//修改节点的位置,获取timeNow时刻的位置
 	}
+	/**
+	 * 通过此函数让子路由协议可以有能力查找全局节点列表
+	 * @return 返回全局节点列表
+	 */
 	public List<DTNHost> getHostsList(){
 		List<DTNHost> totalhosts = new ArrayList<DTNHost>();
 		totalhosts = this.hosts;
