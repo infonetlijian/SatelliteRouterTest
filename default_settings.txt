@@ -7,8 +7,8 @@
 userSetting.routerMode = 1
 #simpleConnectivity;
 #userSetting.routerMode = 2
-#userSetting.hostsMode = cluster
-userSetting.hostsMode = normal
+userSetting.hostsMode = cluster
+#userSetting.hostsMode = normal
 userSetting.nrofPlane = 3
 userSetting.nrofMEO = 3
 
@@ -35,7 +35,7 @@ Interface.type = SimpleSatelliteInterface
 #Interface.type = SatelliteLaserInterface
 # Transmit speed of 2 Mbps = 250kBps
 Interface.transmitSpeed = 100k
-Interface.transmitRange = 40000
+Interface.transmitRange = 7000
 
 
 
@@ -73,7 +73,8 @@ Group.sendQueue = 1
 #Group.router = FirstContactRouter
 #Group.router = DirectDeliveryRouter
 #Group.router = EpidemicRouter
-Group.router = GridRouter
+Group.router = TwoLayerRouterBasedonGridRouter
+#Group.router = GridRouter
 Group.layer = 2
 #Group.Pre_or_onlineOrbitCalculation = preOrbitCalculation
 Group.Pre_or_onlineOrbitCalculation = onlineOrbitCalculation

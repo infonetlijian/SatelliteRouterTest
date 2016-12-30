@@ -564,10 +564,10 @@ public class SimScenario implements Serializable {
 		
 		Random random = new Random();
 		//parameters[0]= random.nextInt(9000)%(2000+1) + 2000;
-		parameters[0]= 34000;
+		parameters[0]= 7850;
 		//this.parameters[0]=8000.0;
 		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
-		parameters[2]= 55;
+		parameters[2]= 90;
 		//parameters[2] = random.nextInt(15);
 		//parameters[3] = random.nextInt(15);
 		parameters[3]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);//0.0;
@@ -590,10 +590,10 @@ public class SimScenario implements Serializable {
 		
 		Random random = new Random();
 		//parameters[0]= random.nextInt(9000)%(2000+1) + 2000;
-		parameters[0]= 40000;
+		parameters[0]= 15000;
 		//this.parameters[0]=8000.0;
 		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
-		parameters[2]= 55;
+		parameters[2]= 90;
 		//parameters[2] = random.nextInt(15);
 		//parameters[3] = random.nextInt(15);
 		parameters[3]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);//0.0;

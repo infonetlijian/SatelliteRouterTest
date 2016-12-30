@@ -337,6 +337,10 @@ public class Message implements Comparable<Message> {
 
 		this.properties.put(key, value);
 	}
+	/**
+	 * 移除新增的属性
+	 * @param key
+	 */
 	public void removeProperty(String key){//新增方法！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 		if (this.properties == null) {
 			/* lazy creation to prevent performance overhead for classes

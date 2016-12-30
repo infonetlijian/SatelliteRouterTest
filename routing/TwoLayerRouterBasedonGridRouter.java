@@ -22,7 +22,7 @@ import core.Settings;
 import core.SimClock;
 import core.SimError;
 
-public class ClusterRouterBasedonGridRouter extends ActiveRouter{
+public class TwoLayerRouterBasedonGridRouter extends ActiveRouter{
 	/**自己定义的变量和映射等
 	 * 
 	 */
@@ -58,21 +58,34 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 	private boolean routerTableUpdateLabel;
 	private GridNeighbors GN;
 	
-	DTNHost MEOinthisTime;
-	Random random = new Random();
+	private DTNHost MEOinthisTime;
+	private Random random = new Random();
+	
+	private double averageMsgLength;
+	private int totalNrofMsg;
+	private double expectedQueuingDelay;
+	private double helloPeriod;
+	private double lastHelloTime;
+	private double linkCapacity;
+	private List<String> msgRecord;
+	/**用于固定时间窗口监测队列延时用**/
+	private HashMap<Double, Tuple<Integer, Integer>> msgMonitorAging;
+	
+
 	/**
 	 * 初始化
 	 * @param s
 	 */
-	public ClusterRouterBasedonGridRouter(Settings s){
+	public TwoLayerRouterBasedonGridRouter(Settings s){
 		super(s);
 	}
 	/**
 	 * 初始化
 	 * @param r
 	 */
-	protected ClusterRouterBasedonGridRouter(ClusterRouterBasedonGridRouter r) {
+	protected TwoLayerRouterBasedonGridRouter(TwoLayerRouterBasedonGridRouter r) {
 		super(r);
+		init();
 		this.GN = new GridNeighbors(this.getHost());//不放在这的原因是，当执行这一步初始化的时候，host和router还没有完成绑定操作
 	}
 	/**
@@ -81,7 +94,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 	@Override
 	public MessageRouter replicate() {
 		//this.GN = new GridNeighbors(this.getHost());
-		return new ClusterRouterBasedonGridRouter(this);
+		return new TwoLayerRouterBasedonGridRouter(this);
 	}
 	/**
 	 * 执行路由的初始化操作
@@ -91,11 +104,20 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 		this.GN.initializeGridLocation();
 	}	
 	/**
+	 * 用于实现发送队列的监控，采集历史队列延迟信息
+	 */
+	public void sendQueueMonitor(){
+		int nrofMsg = this.getNrofMessages();
+	}
+	/**
 	 * 路由更新，每次调用路由更新时的主入口
 	 */
 	@Override
 	public void update() {
 		super.update();
+		/**对队列的监控,更新平均排队时间的预估**/
+		clusterMonitor();
+		queueMonitor(this.helloPeriod);
 		
 		/*测试代码，保证neighbors和connections的一致性*/
 		List<DTNHost> conNeighbors = new ArrayList<DTNHost>();
@@ -121,7 +143,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 			return; // can't start a new transfer
 		}
 		if (connections.size() > 0){//有邻居时需要进行hello包发送协议
-			//helloProtocol();//执行hello包的维护工作
+			//helloProtocol(connections);//执行hello包的维护工作
 		}
 		if (!canStartTransfer())//是否有林杰节点且有信息需要传送
 			return;
@@ -141,6 +163,90 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 				continue;
 			if (findPathToSend(msg, connections, this.msgPathLabel) == true)
 				return;
+		}
+	}
+	/**
+	 * 初始化
+	 */
+	public void init(){
+		averageMsgLength = 0;
+		totalNrofMsg = 0;
+		expectedQueuingDelay = 0;
+		/**周期性信息发送的间隔，2min = 120s**/
+		helloPeriod = 120;
+		lastHelloTime = 0;
+		msgRecord = new ArrayList<String>();
+		msgMonitorAging = new HashMap<Double, Tuple<Integer, Integer>>();
+	}
+	/**
+	 * 分簇监控，计算和维护分簇或者簇头信息
+	 */
+	public void clusterMonitor(){
+		
+	}
+	/**
+	 * 对队列的监控,更新平均排队时间的预估
+	 */
+	public void queueMonitor(double period){
+		/**链路发送速率**/
+		linkCapacity = this.getHost().getInterface(1).getTransmitSpeed();	
+		
+		int msgSize = 0 , nrofMsg = 0;
+		for (Message msg : this.getMessageCollection()){
+			if (!msgRecord.contains(msg.getId())){
+				System.out.println(msg.getId());
+				msgRecord.add(msg.getId());
+				msgSize += msg.getSize();
+				nrofMsg++;
+			}
+		}
+		/**用于实现滑动时间窗口下，动态监控队列延时状态**/
+		if (nrofMsg > 0){
+			Tuple<Integer, Integer> nrofmsgSize = new Tuple<Integer, Integer>(nrofMsg, msgSize);
+			msgMonitorAging.put(SimClock.getTime(), nrofmsgSize);//记录用
+		}
+		/**用于实现滑动时间窗口下，动态监控队列延时状态**/
+		
+		System.out.println(this.getHost() +"  "+ SimClock.getTime() +"  "+ msgSize);
+		this.totalNrofMsg = this.totalNrofMsg + nrofMsg;
+		this.averageMsgLength = 
+				(this.averageMsgLength * this.totalNrofMsg + msgSize)
+				/(this.totalNrofMsg == 0 ? 0.1 : this.totalNrofMsg);//保证分母不为0	
+		
+		/**用于实现滑动时间窗口下，动态监控队列延时状态**/
+		for (double time : msgMonitorAging.keySet()){
+			if (SimClock.getTime() - time > period){
+				/**每次都动态修改全局队列监控参数**/
+				this.averageMsgLength = 
+						(this.averageMsgLength * this.totalNrofMsg - msgMonitorAging.get(time).getValue())//减去已经超过时间窗口的过去信息大小
+						/(this.totalNrofMsg == 0 ? 0.1 : this.totalNrofMsg);//保证分母不为0	
+				this.totalNrofMsg = this.totalNrofMsg - msgMonitorAging.get(time).getKey();		//减去已经超过时间窗口的过去信息个数	
+				/**已经减过的信息记录，从时效性map中去除**/
+				msgMonitorAging.remove(time);
+			}
+		}
+		/**用于实现滑动时间窗口下，动态监控队列延时状态**/
+		
+		if (SimClock.getTime() < period){
+			this.expectedQueuingDelay = (this.totalNrofMsg * this.averageMsgLength)/(this.linkCapacity * SimClock.getTime());
+		}
+		else
+			this.expectedQueuingDelay = (this.totalNrofMsg * this.averageMsgLength)/(this.linkCapacity * period);
+		
+		System.out.println(this.getHost() +"  "+ SimClock.getTime() +"  "+ this.expectedQueuingDelay + "  "+ linkCapacity +"  " +this.averageMsgLength +"  "+ this.totalNrofMsg + " "+nrofMsg);
+	}
+	/**
+	 * 执行定期的节点状态汇报
+	 */
+	public void helloProtocol(List<Connection> connections){
+		if (this.lastHelloTime + this.helloPeriod > SimClock.getTime()){
+			/**新增定期报告消息，包含本节点的延时信息，发送给MEO管理节点**/
+			Message report = new Message(this.getHost(), , this.getHost().getAddress() + "'s report ", 10);
+			/**仅当报告成功发出时才更新lastHelloTime的值**/
+			if (findPathToSend(report, connections, this.msgPathLabel) == true)
+				this.lastHelloTime = SimClock.getTime();
+			
+			
 		}
 	}
 	/**
@@ -323,18 +429,7 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 			else
 				gridSearch(msg, null);
 		}
-
-		/*System.out.println(this.getHost() + "  " +SimClock.getTime()+ "  " + this.routerTable);
-		for (int i = 0; i < 10; i++){
-			System.out.print(this.transmitDelay[i]+"  ");
-		}
-		System.out.println("");
-		
-		for (int i = 0; i < 10; i++){
-			System.out.print(this.endTime[i]+"  ");
-		}
-		System.out.println("");*/
-		
+	
 		//updatePredictionRouter(msg);//需要进行预测
 		if (this.routerTable.containsKey(msg.getTo())){//预测也找不到到达目的节点的路径，则路由失败
 			//m.changeRouterPath(this.routerTable.get(m.getTo()));//把计算出来的路径直接写入信息当中
@@ -1306,8 +1401,9 @@ public class ClusterRouterBasedonGridRouter extends ActiveRouter{
 			for (double time = simClock; time <= simClock + msgTtl*60; time += updateInterval){
 				HashMap<GridCell, List<DTNHost>> cellToHost= new HashMap<GridCell, List<DTNHost>>();
 				for (DTNHost host : hosts){
-					//location.setLocation3D(((SatelliteMovement)host.getMovementModel()).getSatelliteCoordinate(time));//用satellitemovement替换location。my_test，待测试
-					location.my_Test(time, 0, host.getParameters());
+					location.setLocation3D(((SatelliteMovement)host.getMovementModel()).getSatelliteCoordinate(time));//用satellitemovement替换location。my_test，待测试
+					//location.my_Test(time, 0, host.getParameters());
+					//location.setLocation3D(((SatelliteMovement)this.getHost().getMovementModel()).calculateOrbitCoordinate(host.getParameters(), time));
 					
 					GridCell cell = updateLocation(time, location, host);//更新在指定时间节点和网格的归属关系
 					List<DTNHost> hostList = new ArrayList<DTNHost>();

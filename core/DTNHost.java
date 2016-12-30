@@ -47,9 +47,7 @@ public class DTNHost implements Comparable<DTNHost> {
 	
 	
 	/*修改函数部分!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
-	private  double []parameters= new double[6];
 	private Neighbors nei;//新增;
-	//private GridNeighbors GN;
 	
 	/** namespace for host group settings ({@value})*/
 	public static final String GROUP_NS = "Group";
@@ -63,10 +61,6 @@ public class DTNHost implements Comparable<DTNHost> {
 	private List<DTNHost> hostsinCluster = new ArrayList<DTNHost>();//同一个簇内的节点列表
 	private List<DTNHost> hostsinMEO = new ArrayList<DTNHost>();//管理卫星的节点列表
 	
-	private int totalSatellites;//总节点数
-	private int totalPlane;//总平面数
-	private int nrofPlane;//卫星所属轨道平面编号
-	private int nrofSatelliteINPlane;//卫星在轨道平面内的编号
 	private int ClusterNumber;//代表本节点所归属的簇序号
 	
 	private HashMap<Integer, List<DTNHost>> ClusterList = new HashMap<Integer, List<DTNHost>>();
@@ -537,46 +531,40 @@ public class DTNHost implements Comparable<DTNHost> {
 	 * not time to move yet
 	 * @param timeIncrement How long time the node moves
 	 */
-	public void move(double timeIncrement) {		
-		double possibleMovement;
-		double distance;
-		double dx, dy;
-		
+	public void move(double timeIncrement) {				
 		this.location.setLocation3D(((SatelliteMovement)this.movement).getSatelliteCoordinate(SimClock.getTime()));
-		
-		//this.location.my_Test(SimClock.getTime(),timeIncrement,this.parameters);
-		//System.out.println(this+" time: "+SimClock.getTime()+"  "+location);
-		//System.out.println(SimClock.getTime()+"  "+this+"  "+location.getX()+"  "+location.getY()+"  "+location.getZ());
-
 	}	
+	/**
+	 * 根据指定轨道参数计算轨道坐标
+	 * @param parameters
+	 * @param time
+	 * @return
+	 */
 	public double[] calculateOrbitCoordinate(double[] parameters, double time){
 		return ((SatelliteMovement)this.movement).calculateOrbitCoordinate(parameters, time);
 	}
+	/**
+	 * 返回移动模型实体
+	 * @return
+	 */
 	public MovementModel getMovementModel(){
 		return this.movement;
 	}
-	/*新增函数*/
-	//public GridNeighbors getGridNeighbors(){
-	//	return GN;
-	//}
-	
+	/**
+	 * 初始化时，设置卫星轨道的一些参数，SimScenario只调用一次
+	 * @param totalSatellites
+	 * @param totalPlane
+	 * @param nrofPlane
+	 * @param nrofSatelliteInPlane
+	 * @param parameters
+	 */
 	public void setSatelliteParameters(int totalSatellites, int totalPlane, int nrofPlane, int nrofSatelliteInPlane, double[] parameters){
 		
-		for (int i = 0; i < 6; i++){
-			this.parameters[i] = parameters[i];
-		}
-		
+		((SatelliteMovement)this.movement).setOrbitParameters(totalSatellites, totalPlane, nrofPlane, nrofSatelliteInPlane, parameters);
+				
 		this.nei = new Neighbors(this);//新增
-		
-		
-		/*新增参数*/
-		this.totalSatellites = totalSatellites;//总节点数
-		this.totalPlane = totalPlane;//轨道平面数
-		this.nrofPlane = nrofPlane;//卫星所属轨道平面编号
-		this.nrofSatelliteINPlane = nrofSatelliteInPlane;//卫星在轨道平面内的编号
-		
-		((SatelliteMovement)this.movement).setOrbitParameters(parameters);
-		this.location.my_Test(0.0,0.0,this.parameters);//修改节点的初始化位置函数,获取t=0时刻的位置
+		this.location.setLocation3D(((SatelliteMovement)this.movement).getSatelliteCoordinate(SimClock.getTime()));
+
 	}
 	/**
 	 * 初始化时，改变本节点所在的簇序号
@@ -617,13 +605,13 @@ public class DTNHost implements Comparable<DTNHost> {
 	 * 返回卫星所属轨道平面编号参数
 	 */
 	public int getNrofPlane(){
-		return this.nrofPlane;
+		return ((SatelliteMovement)this.movement).getNrofPlane();
 	}
 	/**
 	 * 返回卫星在轨道平面内的编号
 	 */
 	public int getNrofSatelliteINPlane(){
-		return this.nrofSatelliteINPlane;
+		return ((SatelliteMovement)this.movement).getNrofSatelliteINPlane();
 	}
 	/**
 	 * 用于Neighbors进行邻居节点生存时间时用
@@ -634,7 +622,7 @@ public class DTNHost implements Comparable<DTNHost> {
 		double[][] coordinate = new double[1][3];
 		//double[] t = new double[]{8000,0.1,15,0.0,0.0,0.0};;
 
-		SatelliteOrbit saot = new SatelliteOrbit(this.parameters);
+		SatelliteOrbit saot = new SatelliteOrbit(((SatelliteMovement)this.movement).getParameters());
 		//saot.SatelliteOrbit(t);
 		coordinate = saot.getSatelliteCoordinate(time);
 		Coord c = new Coord(0,0);
@@ -643,7 +631,7 @@ public class DTNHost implements Comparable<DTNHost> {
 	}
 	public double getPeriod(){
 
-		SatelliteOrbit saot = new SatelliteOrbit(this.parameters);
+		SatelliteOrbit saot = new SatelliteOrbit(((SatelliteMovement)this.movement).getParameters());
 		//saot.SatelliteOrbit(t);
 		double period = saot.getPeriod();
 		return period;
@@ -661,10 +649,11 @@ public class DTNHost implements Comparable<DTNHost> {
 	 * @return
 	 */
 	public double[] getParameters(){
-		return this.parameters;
+		return ((SatelliteMovement)this.movement).getParameters();
 	}
 	public void changeHostsClusterList(HashMap<Integer, List<DTNHost>> hostsinEachPlane){
 		this.ClusterList = hostsinEachPlane;
+		((SatelliteMovement)this.movement).setHostsClusterList(hostsinEachPlane);
 	}
 	/**
 	 * 改变全局节点列表
@@ -675,6 +664,7 @@ public class DTNHost implements Comparable<DTNHost> {
 		 //this.GN.setHostsList(hosts);
 		 //this.router.setTotalHosts(hosts);
 		 this.hosts = hosts;
+		 ((SatelliteMovement)this.movement).setHostsList(hosts);
 	}
 	/**
 	 * 改变本簇内节点列表，初始化用
@@ -682,6 +672,7 @@ public class DTNHost implements Comparable<DTNHost> {
 	 */
 	public void changeHostsinCluster(List<DTNHost> hostsinCluster){
 		this.hostsinCluster = hostsinCluster;
+		((SatelliteMovement)this.movement).setHostsinCluster(hostsinCluster);
 	}
 	/**
 	 * 改变MEO管理节点列表，初始化用
@@ -689,14 +680,9 @@ public class DTNHost implements Comparable<DTNHost> {
 	 */
 	public void changeHostsinMEO(List<DTNHost> hostsinMEO){
 		this.hostsinMEO = hostsinMEO;
+		((SatelliteMovement)this.movement).setHostsinMEO(hostsinMEO);
 	}
-	/**
-	 * 更新本节点指定时间的位置坐标
-	 * @param timeNow
-	 */
-	public void updateLocation(double timeNow){
-		this.location.my_Test(0.0,timeNow,this.parameters);//修改节点的位置,获取timeNow时刻的位置
-	}
+
 	/**
 	 * 通过此函数让子路由协议可以有能力查找全局节点列表
 	 * @return 返回全局节点列表

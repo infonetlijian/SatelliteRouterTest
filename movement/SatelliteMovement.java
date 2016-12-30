@@ -1,20 +1,39 @@
 package movement;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 import core.Coord;
+import core.DTNHost;
 import core.Settings;
 import jat.orbit.SatelliteOrbit;
 
 public class SatelliteMovement extends MovementModel{
 	
-	public double a = 8000.; // sma in km
-	double e = 0.1; // eccentricity
-	double i = 15; // inclination in degrees
-	double raan = 0.0; // right ascension of ascending node in degrees
-	double w = 0.0; // argument of perigee in degrees
-	double ta = 0.0; // true anomaly in degrees
-	double[] orbitParameters;
-	SatelliteOrbit satelliteOrbit;
+	private double a = 8000.; // sma in km
+	private double e = 0.1; // eccentricity
+	private double i = 15; // inclination in degrees
+	private double raan = 0.0; // right ascension of ascending node in degrees
+	private double w = 0.0; // argument of perigee in degrees
+	private double ta = 0.0; // true anomaly in degrees
+	private double[] orbitParameters;
+	
+	private SatelliteOrbit satelliteOrbit;
 
+	private int LEOtotalSatellites;//总节点数
+	private int LEOtotalPlane;//轨道平面数
+	private int nrofPlane;//卫星所属轨道平面编号
+	private int nrofSatelliteINPlane;//卫星在轨道平面内的编号
+	
+	private List<DTNHost> hosts = new ArrayList<DTNHost>();//全局卫星节点列表
+	private List<DTNHost> hostsinCluster = new ArrayList<DTNHost>();//同一个簇内的节点列表
+	private List<DTNHost> hostsinMEO = new ArrayList<DTNHost>();//管理卫星的节点列表
+	
+	private int ClusterNumber;//代表本节点所归属的簇序号
+	
+	private HashMap<Integer, List<DTNHost>> ClusterList = new HashMap<Integer, List<DTNHost>>();//每个簇的编号，和对应的簇内节点列表
+	
 	public SatelliteMovement(Settings settings) {
 		super(settings);
 	}
@@ -22,7 +41,39 @@ public class SatelliteMovement extends MovementModel{
 	protected SatelliteMovement(SatelliteMovement rwp) {
 		super(rwp);
 	}
-	
+	public void setHostsinMEO(List<DTNHost> hostsinMEO){
+		this.hostsinMEO = hostsinMEO;
+	}
+	public void setHostsinCluster(List<DTNHost> hostsinCluster){
+		this.hostsinCluster = hostsinCluster;
+	}
+	public void setHostsClusterList(HashMap<Integer, List<DTNHost>> hostsinEachPlane){
+		this.ClusterList = hostsinEachPlane;
+	}
+	public void setHostsList(List<DTNHost> hosts){
+		this.hosts = hosts;
+	}
+	/**
+	 * 初始化时调用一次，设置轨道参数相关信息
+	 * @param LEOtotalSatellites
+	 * @param LEOtotalPlane
+	 * @param nrofPlane
+	 * @param nrofSatelliteInPlane
+	 * @param parameters
+	 */
+	public void setOrbitParameters(int LEOtotalSatellites, int LEOtotalPlane, int nrofPlane, int nrofSatelliteInPlane, double[] parameters){
+		setOrbitParameters(parameters);
+		
+		/*新增参数*/
+		this.LEOtotalSatellites = LEOtotalSatellites;//总节点数
+		this.LEOtotalPlane = LEOtotalPlane;//轨道平面数
+		this.nrofPlane = nrofPlane;//卫星所属轨道平面编号
+		this.nrofSatelliteINPlane = nrofSatelliteInPlane;//卫星在轨道平面内的编号
+	}
+	/**
+	 * 设置卫星轨道6参数
+	 * @param parameters
+	 */
 	public void setOrbitParameters(double[] parameters){
 		assert parameters.length >= 6 : "传入的卫星轨道参数不全";
 			
@@ -40,7 +91,11 @@ public class SatelliteMovement extends MovementModel{
 
 		this.satelliteOrbit = new SatelliteOrbit(this.orbitParameters);
 	}
-	
+	/**
+	 * 获取指定时间的卫星坐标
+	 * @param time
+	 * @return
+	 */
 	public double[] getSatelliteCoordinate(double time){
 		double[][] coordinate = new double[1][3];
 		double[] xyz = new double[3];
@@ -53,7 +108,12 @@ public class SatelliteMovement extends MovementModel{
 		
 		return xyz;
 	}
-
+	/**
+	 * 根据指定轨道参数，计算指定时间的轨道坐标
+	 * @param parameters
+	 * @param time
+	 * @return
+	 */
 	public double[] calculateOrbitCoordinate(double[] parameters, double time){
 		double[][] coordinate = new double[1][3];
 		
@@ -61,6 +121,25 @@ public class SatelliteMovement extends MovementModel{
 		coordinate = so.getSatelliteCoordinate(time);
 		
 		return coordinate[0];
+	}
+	/**
+	 * 返回卫星所属轨道平面编号参数
+	 */
+	public int getNrofPlane(){
+		return this.nrofPlane;
+	}
+	/**
+	 * 返回卫星在轨道平面内的编号
+	 */
+	public int getNrofSatelliteINPlane(){
+		return this.nrofSatelliteINPlane;
+	}
+	/**
+	 * 新增函数，返回新增的卫星轨道参数
+	 * @return
+	 */
+	public double[] getParameters(){
+		return this.orbitParameters;
 	}
 	/**
 	 * Returns a possible (random) placement for a host
