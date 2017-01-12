@@ -22,6 +22,7 @@ import movement.Path;
 import movement.SatelliteMovement;
 import routing.GridRouter;
 import routing.MessageRouter;
+import routing.ShortestDistanceSpaceRouter;
 import routing.util.RoutingInfo;
 
 /**
@@ -706,7 +707,8 @@ public class DTNHost implements Comparable<DTNHost> {
 		
 		switch (orbitCalculationWay.get(option)){
 		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
-			((GridRouter)this.router).initialzation();
+			((ShortestDistanceSpaceRouter)this.router).initialzation();
+			//((GridRouter)this.router).initialzation();
 			break;
 		case 2:		
 			break;

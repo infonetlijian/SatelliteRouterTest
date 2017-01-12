@@ -417,7 +417,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		searchedSet.add(this.getHost());
 		while(true){
 			double minDistance = 100000;
-			double startTime = SimClock.getTime();
+			//double startTime = SimClock.getTime();
 			double prevTime = 0;//记录前一跳的截止时间
 			for (DTNHost host : sourceSet){
 				double waitTime = 0;
@@ -451,85 +451,85 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			}
 			sourceSet = GN.getNeighbors(minHost, minTime);
 		}
-		
-		
-		while(true){//Dijsktra算法思想，每次历遍全局，找时延最小的加入路由表，保证路由表中永远是时延最小的路径
-			if (iteratorTimes >= size || updateLabel == false)
-				break; 
-			updateLabel = false;
-			minTime = 100000;
-			HashMap<DTNHost, Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>>> 
-						predictionList = new HashMap<DTNHost, Tuple<HashMap<DTNHost, List<Double>>, 
-						HashMap<DTNHost, List<Double>>>>();//存储机制，如果之前已经算过就不用再重复计算了
-			
-			for (DTNHost host : sourceSet){
-				Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime;//邻居节点到达时间和离开时间的二元组组合
-				HashMap<DTNHost, List<Double>> startTime;
-				HashMap<DTNHost, List<Double>> leaveTime;
-				
-				if (predictionList.containsKey(host)){//存储机制，如果之前已经算过就不用再重复计算了
-					predictTime = predictionList.get(host);
-				}
-				else{
-					List<DTNHost> neiList = GN.getNeighbors(host, arrivalTime.get(host));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
-					assert neiList == null:"没能成功读取到指定时间的邻居";
-					predictTime = GN.getFutureNeighbors(neiList, host, arrivalTime.get(host));
-				}
-				startTime = predictTime.getKey();
-				leaveTime = predictTime.getValue();
-				if (startTime.keySet().isEmpty())
-					continue;
-				for (DTNHost neiHost : startTime.keySet()){//startTime.keySet()包含了所有的邻居节点，包含未来的邻居节点
-					if (sourceSet.contains(neiHost))
-						continue;
-					if (arrivalTime.get(host) >= SimClock.getTime() + msgTtl*60)//出发时间就已经超出TTL预测时间的话就直接排除
-						continue;
-					double waitTime = startTime.get(neiHost).get(0) - arrivalTime.get(host);
-					if (waitTime <= 0){
-						predictLable = false;
-						//System.out.println("waitTime = "+ waitTime);
-						waitTime = 0;
-					}
-					if (waitTime > 0)
-						predictLable = true;
-					double time = arrivalTime.get(host) + msg.getSize()/host.getInterface(1).getTransmitSpeed() + waitTime;
-					List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();
-					if (this.routerTable.containsKey(host))
-						path.addAll(this.routerTable.get(host));
-					Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), predictLable);
-					path.add(hop);//注意顺序
-					/*待修改，应该是leavetime的检查!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
-					if (leaveTime.isEmpty()){
-						if (time > SimClock.getTime() + msgTtl*60)
-							continue;
-					}
-					else{
-						if (time > leaveTime.get(neiHost).get(0))
-							continue;
-					}
-					/*待修改，应该是leavetime的检查!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
-					if (time <= minTime){
-						if (random.nextBoolean() == true && time - minTime < 1){
-							minTime = time;
-							minHost = neiHost;
-							minPath = path;
-							updateLabel = true;	
-						}
-					}					
-				}
-			}
-			if (updateLabel == true){
-				arrivalTime.put(minHost, minTime);
-				routerTable.put(minHost, minPath);
-			}
-			iteratorTimes++;
-			sourceSet.add(minHost);//将新的最短节点加入
-			if (routerTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
-				break;
-		}
-		routerTableUpdateLabel = true;
-		
 		System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());
+//		
+//		while(true){//Dijsktra算法思想，每次历遍全局，找时延最小的加入路由表，保证路由表中永远是时延最小的路径
+//			if (iteratorTimes >= size || updateLabel == false)
+//				break; 
+//			updateLabel = false;
+//			minTime = 100000;
+//			HashMap<DTNHost, Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>>> 
+//						predictionList = new HashMap<DTNHost, Tuple<HashMap<DTNHost, List<Double>>, 
+//						HashMap<DTNHost, List<Double>>>>();//存储机制，如果之前已经算过就不用再重复计算了
+//			
+//			for (DTNHost host : sourceSet){
+//				Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime;//邻居节点到达时间和离开时间的二元组组合
+//				HashMap<DTNHost, List<Double>> startTime;
+//				HashMap<DTNHost, List<Double>> leaveTime;
+//				
+//				if (predictionList.containsKey(host)){//存储机制，如果之前已经算过就不用再重复计算了
+//					predictTime = predictionList.get(host);
+//				}
+//				else{
+//					List<DTNHost> neiList = GN.getNeighbors(host, arrivalTime.get(host));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
+//					assert neiList == null:"没能成功读取到指定时间的邻居";
+//					predictTime = GN.getFutureNeighbors(neiList, host, arrivalTime.get(host));
+//				}
+//				startTime = predictTime.getKey();
+//				leaveTime = predictTime.getValue();
+//				if (startTime.keySet().isEmpty())
+//					continue;
+//				for (DTNHost neiHost : startTime.keySet()){//startTime.keySet()包含了所有的邻居节点，包含未来的邻居节点
+//					if (sourceSet.contains(neiHost))
+//						continue;
+//					if (arrivalTime.get(host) >= SimClock.getTime() + msgTtl*60)//出发时间就已经超出TTL预测时间的话就直接排除
+//						continue;
+//					double waitTime = startTime.get(neiHost).get(0) - arrivalTime.get(host);
+//					if (waitTime <= 0){
+//						predictLable = false;
+//						//System.out.println("waitTime = "+ waitTime);
+//						waitTime = 0;
+//					}
+//					if (waitTime > 0)
+//						predictLable = true;
+//					double time = arrivalTime.get(host) + msg.getSize()/host.getInterface(1).getTransmitSpeed() + waitTime;
+//					List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();
+//					if (this.routerTable.containsKey(host))
+//						path.addAll(this.routerTable.get(host));
+//					Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), predictLable);
+//					path.add(hop);//注意顺序
+//					/*待修改，应该是leavetime的检查!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+//					if (leaveTime.isEmpty()){
+//						if (time > SimClock.getTime() + msgTtl*60)
+//							continue;
+//					}
+//					else{
+//						if (time > leaveTime.get(neiHost).get(0))
+//							continue;
+//					}
+//					/*待修改，应该是leavetime的检查!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+//					if (time <= minTime){
+//						if (random.nextBoolean() == true && time - minTime < 1){
+//							minTime = time;
+//							minHost = neiHost;
+//							minPath = path;
+//							updateLabel = true;	
+//						}
+//					}					
+//				}
+//			}
+//			if (updateLabel == true){
+//				arrivalTime.put(minHost, minTime);
+//				routerTable.put(minHost, minPath);
+//			}
+//			iteratorTimes++;
+//			sourceSet.add(minHost);//将新的最短节点加入
+//			if (routerTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
+//				break;
+//		}
+//		routerTableUpdateLabel = true;
+//		
+//		System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());
 	}
 	
 
@@ -937,51 +937,47 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		 * @return
 		 */
 		public double calculateDistance(DTNHost source, DTNHost destination, double startTime, double endTime){		
-			List<GridCell> p1 = gridLocation.get(source);
+			List<GridCell> p1 = gridLocation.get(source);//指定节点一个周期内经过的网格列表
 			List<GridCell> p2 = gridLocation.get(destination);
-			List<Double> t1 = gridTime.get(source);
+			System.out.println(gridTime+"  "+source+"  "+destination);
+			List<Double> t1 = gridTime.get(source);//指定节点在经过这些网格时对应的时间
 			List<Double> t2 = gridTime.get(destination);
 			
-			int startLocation_1 = findMostCloseValueFromList(t1, startTime);
-			int endLocation_1 = findMostCloseValueFromList(t1, endTime);
-			int startLocation_2 = findMostCloseValueFromList(t2, startTime);
-			int endLocation_2 = findMostCloseValueFromList(t2, endTime);
-			
-			List<GridCell> pathDuringTTL_1 = new ArrayList<GridCell>();		
-			for (int i = startLocation_1; i <= endLocation_1; i++){
-				pathDuringTTL_1.add(p1.get(i));
+//			int startLocation_1 = findMostCloseValueFromList(t1, startTime);
+//			int endLocation_1 = findMostCloseValueFromList(t1, endTime);
+//			int startLocation_2 = findMostCloseValueFromList(t2, startTime);
+//			int endLocation_2 = findMostCloseValueFromList(t2, endTime);
+//			
+//			List<GridCell> pathDuringTTL_1 = new ArrayList<GridCell>();		
+//			for (int i = startLocation_1; i <= endLocation_1; i++){
+//				pathDuringTTL_1.add(p1.get(i));
+//			}
+//			List<GridCell> pathDuringTTL_2 = new ArrayList<GridCell>();
+//			for (int i = startLocation_2; i <= endLocation_2; i++){
+//				pathDuringTTL_2.add(p1.get(i));
+//			}
+			double interval = 1.0;
+			int location_1 = 0, location_2 = 0;
+			double distance = 0;
+			for (double t = startTime; t <= endTime; t += interval){
+				location_1 = findMostCloseValueFromList(t1, t);
+				location_2 = findMostCloseValueFromList(t2, t);
+				/*计算各自网格的三维 坐标之差*/
+				for (int i = 0; i < 3; i++){
+					distance = distance + Math.abs(p1.get(location_1).getNumber()[i] - p2.get(location_2).getNumber()[i]);
+				}			
 			}
-			List<GridCell> pathDuringTTL_2 = new ArrayList<GridCell>();
-			for (int i = startLocation_2; i <= endLocation_2; i++){
-				pathDuringTTL_2.add(p1.get(i));
-			}
-			
-			this
 			//有问题，待修改！！！！！！！！！！！！！！！
-			/*计算各自网格坐标之和*/
-			int sumofGridCoordinate_1 = 0;
-			for(GridCell gc : pathDuringTTL_1){
-				sumofGridCoordinate_1 += gc.getNumber()[0];
-				sumofGridCoordinate_1 += gc.getNumber()[1];
-				sumofGridCoordinate_1 += gc.getNumber()[2];
-			}
-			int sumofGridCoordinate_2 = 0;
-			for(GridCell gc : pathDuringTTL_1){
-				sumofGridCoordinate_2 += gc.getNumber()[0];
-				sumofGridCoordinate_2 += gc.getNumber()[1];
-				sumofGridCoordinate_2 += gc.getNumber()[2];
-			}
-			
-			double distance = Math.abs(sumofGridCoordinate_1 - sumofGridCoordinate_2);
-			
+	
 			return distance;
 		}
 		
 		public int findMostCloseValueFromList(List<Double> t1, double time){
 			double minDifferenceValue = 10000000;
-			int iterator;
+			int iterator = 0;
+			System.out.println(t1.size());
 			for (int i = 0; i < t1.size(); i++){
-				double differenceValue = Math.abs(t1.get(i) - Time);
+				double differenceValue = Math.abs(t1.get(i) - time);
 				if (differenceValue < minDifferenceValue){
 					minDifferenceValue = differenceValue;
 					iterator = i;

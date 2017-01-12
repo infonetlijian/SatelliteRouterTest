@@ -184,8 +184,10 @@ public class TwoLayerRouterBasedonGridRouter extends ActiveRouter{
 	public void clusterMonitor(){
 		
 	}
+
 	/**
 	 * 对队列的监控,更新平均排队时间的预估
+	 * @param period 监测的时间窗口大小
 	 */
 	public void queueMonitor(double period){
 		/**链路发送速率**/
@@ -245,8 +247,7 @@ public class TwoLayerRouterBasedonGridRouter extends ActiveRouter{
 			/**仅当报告成功发出时才更新lastHelloTime的值**/
 			if (findPathToSend(report, connections, this.msgPathLabel) == true)
 				this.lastHelloTime = SimClock.getTime();
-			
-			
+	
 		}
 	}
 	/**
