@@ -401,12 +401,10 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		int iteratorTimes = 0;
 		int size = this.hosts.size();
 		double minTime = 100000;
-		DTNHost minHost =null;
+		DTNHost minHost = this.getHost();
 		boolean updateLabel = true;
 		boolean predictLable = false;
-		List<Tuple<Integer, Boolean>> minPath = new ArrayList<Tuple<Integer, Boolean>>();
-
-		
+	
 		arrivalTime.put(this.getHost(), SimClock.getTime());//初始化到达时间
 		
 		/*首先搜索是不是一跳的邻居节点，是邻居节点则直接返回*/
@@ -415,43 +413,50 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		/*首先搜索是不是一跳的邻居节点，是邻居节点则直接返回*/
 		List<DTNHost> searchedSet = new ArrayList<DTNHost>();
 		searchedSet.add(this.getHost());
+		
+		List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();//用于记录算法搜索到的，到达目的节点的路径
 		while(true){
 			double minDistance = 100000;
-			//double startTime = SimClock.getTime();
 			double prevTime = 0;//记录前一跳的截止时间
-			for (DTNHost host : sourceSet){
+			
+			DTNHost prevHost = minHost;
+			
+			List<DTNHost> neiList = GN.getNeighbors(prevHost, arrivalTime.get(prevHost));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
+			Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime = GN.getFutureNeighbors(neiList, prevHost, arrivalTime.get(prevHost));
+			
+			HashMap<DTNHost, List<Double>> startTime = predictTime.getKey();
+			HashMap<DTNHost, List<Double>> leaveTime = predictTime.getValue();
+			
+			List<DTNHost> neighborNodes= new ArrayList<DTNHost>(startTime.keySet());//得到prevHost上一跳的邻居节点//startTime.keySet()包含了所有的邻居节点，包含未来的邻居节点
+			
+			for (DTNHost host : neighborNodes){
 				double waitTime = 0;
 				if (searchedSet.contains(host))
 					continue;
-				
-				Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime;//邻居节点到达时间和离开时间的二元组组合
-				HashMap<DTNHost, List<Double>> startTime;
-				HashMap<DTNHost, List<Double>> leaveTime;
-				List<DTNHost> neiList = GN.getNeighbors(host, arrivalTime.get(host));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
-				assert neiList == null:"没能成功读取到指定时间的邻居";
-				predictTime = GN.getFutureNeighbors(neiList, host, arrivalTime.get(host));
-				
-				startTime = predictTime.getKey();
-				leaveTime = predictTime.getValue();
-				
 				if (prevTime < startTime.get(host).get(0))
 					waitTime = startTime.get(host).get(0) - prevTime;//如果为真，则为一个未来到达的节点，需要有等待延时
 				double time = prevTime + msg.getSize()/host.getInterface(1).getTransmitSpeed() + waitTime;
 				
 				double distance = GN.calculateDistance(this.getHost(), host, time, time+this.msgTtl);
-				if (distance < minDistance){
-					minDistance = distance;
-					minHost = host;
-					minTime = time;
+				if (distance <= minDistance){
+					if (random.nextBoolean() == true && distance - minDistance < 0.1){//如果碰到一样距离的节点，就随机选一个
+						minDistance = distance;
+						minHost = host;
+						minTime = time;
+						prevTime = minTime;
+					}
 				}
-				searchedSet.add(host);//代表已经搜索过的节点				
+				searchedSet.add(host);//代表已经搜索过的节点	
 			}
+			waitTime > 0 ? path.add(new Tuple<Integer, Boolean>(minHost, true)) : path.add(new Tuple<Integer, Boolean>(minHost, false));//每一跳搜索完之后，记录路由路径
 			if (GN.getNeighbors(minHost, minTime).contains(msg.getTo())){
-				break;//找到一条路径就退出
+				this.routerTable.put(msg.getTo(), path);
+				break;//找到一条能到达目的节点的路径就退出
 			}
-			sourceSet = GN.getNeighbors(minHost, minTime);
 		}
-		System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());
+		
+	
+		System.out.println(this.getHost()+" path: "+path+ " to "+msg.getTo()+" time : "+SimClock.getTime());
 //		
 //		while(true){//Dijsktra算法思想，每次历遍全局，找时延最小的加入路由表，保证路由表中永远是时延最小的路径
 //			if (iteratorTimes >= size || updateLabel == false)
@@ -975,7 +980,6 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		public int findMostCloseValueFromList(List<Double> t1, double time){
 			double minDifferenceValue = 10000000;
 			int iterator = 0;
-			System.out.println(t1.size());
 			for (int i = 0; i < t1.size(); i++){
 				double differenceValue = Math.abs(t1.get(i) - time);
 				if (differenceValue < minDifferenceValue){
@@ -1029,7 +1033,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			//System.out.println(host+" 邻居列表   "+hostList);
 			return hostList;
 		}
-
+		
 		public Tuple<HashMap<DTNHost, List<Double>>, //neiList 为已经计算出的当前邻居节点列表
 			HashMap<DTNHost, List<Double>>> getFutureNeighbors(List<DTNHost> neiList, DTNHost host, double time){
 			int num = (int)((time-SimClock.getTime())/updateInterval);

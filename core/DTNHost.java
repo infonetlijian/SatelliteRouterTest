@@ -701,14 +701,26 @@ public class DTNHost implements Comparable<DTNHost> {
 		String routerType = s.getSetting("router");//总节点数
 		String option = s.getSetting("Pre_or_onlineOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
 		
+		HashMap<String, Integer> gridRouterList = new HashMap<String, Integer>();//多种用到网格法的路由，需要在初始化的时候进行区分
+		gridRouterList.put("GridRouter", 1);
+		gridRouterList.put("ShortestDistanceSpaceRouter", 2);
+		
 		HashMap<String, Integer> orbitCalculationWay = new HashMap<String, Integer>();
 		orbitCalculationWay.put("preOrbitCalculation", 1);
 		orbitCalculationWay.put("onlineOrbitCalculation", 2);
 		
 		switch (orbitCalculationWay.get(option)){
 		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
-			((ShortestDistanceSpaceRouter)this.router).initialzation();
-			//((GridRouter)this.router).initialzation();
+			switch (gridRouterList.get(routerType)){
+			case 2:
+				((ShortestDistanceSpaceRouter)this.router).initialzation();
+				break;
+			case 1:
+				((GridRouter)this.router).initialzation();
+				break;
+			default: 
+				System.out.println("initialzation error in DTNHost.java line 722");
+			}
 			break;
 		case 2:		
 			break;

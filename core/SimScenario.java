@@ -473,8 +473,8 @@ public class SimScenario implements Serializable {
 		
 		/**通过map解决switch case不支持string类型的情况(JAVA 1.7以下不支持)**/
 		Map<String,Integer> mode=new HashMap<String, Integer>();
-		mode.put("normal", 1);
-		mode.put("cluster", 2);
+		mode.put("normal", 1);//全局路由（不分簇）
+		mode.put("cluster", 2);//分簇路由
 		/**通过map解决switch case不支持string类型的情况(JAVA 1.7以下不支持)**/
 		
 		switch(mode.get(string)){
@@ -489,7 +489,7 @@ public class SimScenario implements Serializable {
 			}		
 			for (DTNHost host : this.hosts){//新增，传入全局列表参数
 				host.changeHostsList(hosts);
-				host.initialzationRouter();
+				host.initialzationRouter();//路由初始化
 			}
 			break;
 		}
