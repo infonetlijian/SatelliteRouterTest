@@ -19,6 +19,8 @@ import movement.MapBasedMovement;
 import movement.MovementModel;
 import movement.map.SimMap;
 import routing.MessageRouter;
+import routing.ShortestDistanceSpaceRouter.GridNeighbors.GridCell;
+import util.Tuple;
 
 /**
  * A simulation scenario used for getting and storing the settings of a
@@ -486,10 +488,21 @@ public class SimScenario implements Serializable {
 				List<DTNHost> hosts = new ArrayList<DTNHost>();
 				hosts.addAll(createInitialHosts(nrofHosts, 1, "LEO"));//初始化生成指定数量的节点
 				//全局节点列表this.hosts在函数createInitialHosts()内已经更新过
-			}		
+			}
+			
+			Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>> gridInfo = 
+					new Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>>(null, null);
+			boolean firstCalculationLable = true;
 			for (DTNHost host : this.hosts){//新增，传入全局列表参数
 				host.changeHostsList(hosts);
-				host.initialzationRouter();//路由初始化
+				/*因为每个节点的初始化计算过程一样，所以精简这一过程，只计算一次，后面的复制即可*/
+				if (firstCalculationLable == true){
+					gridInfo = host.initialzationRouter(firstCalculationLable, gridInfo);//路由初始化
+					firstCalculationLable = false;
+				}
+				else
+					host.initialzationRouter(firstCalculationLable, gridInfo);
+				/*因为每个节点的初始化计算过程一样，所以精简这一过程，只计算一次，后面的复制即可*/
 			}
 			break;
 		}
@@ -539,11 +552,20 @@ public class SimScenario implements Serializable {
 					host.changeHostsinMEO(hostsinMEO);//传入MEO管理节点列表
 				}
 			}	
-			
+			Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>> gridInfo = 
+					new Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>>(null, null);
+			boolean firstCalculationLable = true;
 			for (DTNHost host : this.hosts){//无论是MEO或是LEO都传入全局节点列表参数
 				host.changeHostsClusterList(hostsinEachPlane);//传入所有簇的节点列表
 				host.changeHostsList(hosts);
-				host.initialzationRouter();
+				/*因为每个节点的初始化计算过程一样，所以精简这一过程，只计算一次，后面的复制即可*/
+				if (firstCalculationLable == true){
+					gridInfo = host.initialzationRouter(firstCalculationLable, gridInfo);//路由初始化
+					firstCalculationLable = false;
+				}
+				else
+					host.initialzationRouter(firstCalculationLable, gridInfo);
+				/*因为每个节点的初始化计算过程一样，所以精简这一过程，只计算一次，后面的复制即可*/
 			}
 			break;
 		}

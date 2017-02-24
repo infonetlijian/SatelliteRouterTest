@@ -23,7 +23,9 @@ import movement.SatelliteMovement;
 import routing.GridRouter;
 import routing.MessageRouter;
 import routing.ShortestDistanceSpaceRouter;
+import routing.ShortestDistanceSpaceRouter.GridNeighbors.GridCell;
 import routing.util.RoutingInfo;
+import util.Tuple;
 
 /**
  * A DTN capable host.
@@ -696,7 +698,8 @@ public class DTNHost implements Comparable<DTNHost> {
 	/**
 	 * 当选用gridRouter时，需要进行初始化操作，即提前计算所有轨道信息
 	 */
-	public void initialzationRouter(){
+	public Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>> 
+			initialzationRouter(boolean firstCalculationLable, Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>> gridInfo){
 		Settings s = new Settings(GROUP_NS);
 		String routerType = s.getSetting("router");//总节点数
 		String option = s.getSetting("Pre_or_onlineOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
@@ -709,12 +712,14 @@ public class DTNHost implements Comparable<DTNHost> {
 		orbitCalculationWay.put("preOrbitCalculation", 1);
 		orbitCalculationWay.put("onlineOrbitCalculation", 2);
 		
+		if (!gridRouterList.containsKey(routerType)) //非grid路由
+			return null;
 		switch (orbitCalculationWay.get(option)){
 		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
 			switch (gridRouterList.get(routerType)){
 			case 2:
-				((ShortestDistanceSpaceRouter)this.router).initialzation();
-				break;
+				return ((ShortestDistanceSpaceRouter)this.router).initialzation(firstCalculationLable, gridInfo);
+				//break;
 			case 1:
 				((GridRouter)this.router).initialzation();
 				break;
@@ -725,6 +730,7 @@ public class DTNHost implements Comparable<DTNHost> {
 		case 2:		
 			break;
 		}
+		return null;
 
 	}
 }

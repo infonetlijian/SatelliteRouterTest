@@ -26,9 +26,11 @@ package routing;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
+import routing.ShortestDistanceSpaceRouter.GridNeighbors.GridCell;
 import movement.MovementModel;
 import movement.SatelliteMovement;
 import util.Tuple;
@@ -74,6 +76,8 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 	private HashMap<String, Double> busyLabel = new HashMap<String, Double>();//指示下一跳节点处于忙的状态，需要等待
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> neighborsList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();//新增全局其它节点邻居链路生存时间信息
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> predictList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();
+	/*用于实现多重拷贝传输机制*/
+	private HashMap<String, Message> multiCopyList = new HashMap<String, Message>(); 
 	
 	private boolean routerTableUpdateLabel;
 	private GridNeighbors GN;
@@ -106,9 +110,10 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 	/**
 	 * 执行路由的初始化操作
 	 */
-	public void initialzation(){
-		GN.setHost(this.getHost());//为了实现GN和Router以及Host之间的绑定，待修改！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
-		this.GN.initializeGridLocation();
+	public Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>> 
+			initialzation(boolean firstCalculationLable, Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>> gridInfo){
+		GN.setHost(this.getHost());//为了实现GN和Router以及Host之间的绑定，待修改！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！)
+		return this.GN.initializeGridLocation(firstCalculationLable, gridInfo);
 	}	
 	/**
 	 * 路由更新，每次调用路由更新时的主入口
@@ -156,11 +161,27 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		routerTableUpdateLabel = false;
 		if (messages.isEmpty())
 			return;
+		
+		//this.sortByQueueMode(multiCopyList);
+		/*用于单独实现多重拷贝传输机制*/
+		for (Message msg : multiCopyList.values()){
+			if (checkBusyLabelForNextHop(msg))
+				continue;
+			if (conNeighbors.contains(msg.getTo())){
+				Tuple<Message, Connection> t = new Tuple<Message, Connection>(msg, this.findConnection(msg.getTo().getAddress()));//按待发送消息顺序找路径，并尝试发送
+				if (sendMsg(t))
+					return;
+			}			
+		}
+		/*用于单独实现多重拷贝传输机制*/
+		this.sortByQueueMode(messages);
 		for (Message msg : messages){//尝试发送队列里的消息	
 			if (checkBusyLabelForNextHop(msg))
 				continue;
-			if (findPathToSend(msg, connections, this.msgPathLabel) == true)
+			if (findPathToSend(msg, connections, this.msgPathLabel) == true){
 				return;
+			}
+
 		}
 	}
 	/**
@@ -324,20 +345,13 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 	 */
 	public boolean updateRouterTable(Message msg){
 		
-		
-		
 		gridSearch(msg);
 		
-		/*System.out.println(this.getHost() + "  " +SimClock.getTime()+ "  " + this.routerTable);
-		for (int i = 0; i < 10; i++){
-			System.out.print(this.transmitDelay[i]+"  ");
-		}
-		System.out.println("");
-		
-		for (int i = 0; i < 10; i++){
-			System.out.print(this.endTime[i]+"  ");
-		}
-		System.out.println("");*/
+		/*多重拷贝传输机制的实现*/
+		if (msg.getProperty("MultiCopy") != null)
+			if ((boolean)msg.getProperty("MultiCopy") == true)	
+				multiCopyList.put(msg.getId(), msg.replicate());//复制得到的msg的id是一样的，但是unquidID不一样	
+		/*多重拷贝传输机制的实现*/
 		
 		//updatePredictionRouter(msg);//需要进行预测
 		if (this.routerTable.containsKey(msg.getTo())){//预测也找不到到达目的节点的路径，则路由失败
@@ -386,10 +400,12 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		List<DTNHost> sourceSet = new ArrayList<DTNHost>();
 		sourceSet.add(this.getHost());//初始时只有本节点
 		
+		List<DTNHost> neiHosts = new ArrayList<DTNHost>();//用于记录可以连接的邻居节点
 		for (Connection con : this.getHost().getConnections()){//添加链路可探测到的一跳邻居，并更新路由表
 			DTNHost neiHost = con.getOtherNode(this.getHost());
+			neiHosts.add(neiHost);
 			sourceSet.add(neiHost);//初始时只有本节点和链路邻居		
-			Double time = SimClock.getTime() + msg.getSize()/this.getHost().getInterface(1).getTransmitSpeed();
+			double time = SimClock.getTime() + msg.getSize()/this.getHost().getInterface(1).getTransmitSpeed();
 			List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();
 			Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), false);
 			path.add(hop);//注意顺序
@@ -404,8 +420,9 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		DTNHost minHost = this.getHost();
 		boolean updateLabel = true;
 		boolean predictLable = false;
-	
-		arrivalTime.put(this.getHost(), SimClock.getTime());//初始化到达时间
+
+		
+		arrivalTime.put(this.getHost(), SimClock.getTime());//初始化到达时间，加入本节点的执行此算法时的时间，后面搜索邻居节点时会用到
 		
 		/*首先搜索是不是一跳的邻居节点，是邻居节点则直接返回*/
 		if (this.routerTable.containsKey(msg.getTo()))
@@ -415,48 +432,279 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		searchedSet.add(this.getHost());
 		
 		List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();//用于记录算法搜索到的，到达目的节点的路径
-		while(true){
-			double minDistance = 100000;
-			double prevTime = 0;//记录前一跳的截止时间
+		
+		//String standard = "ShortestDistance";
+		String standard = "MinimumSpeed";
+		HashMap<String, Integer> routerStandard = new HashMap<String, Integer>();
+		routerStandard.put("ShortestDistance", 1);
+		routerStandard.put("MinimumSpeed", 2);
+		
+		switch (routerStandard.get(standard)){
+		case 1:{
+			/*新方案的测试代码*/
+			/*以最短空间距离为路由准则，只搜索具有最短空间距离的的邻居节点作为下一跳(包括预测节点)，同时考虑TTL的限制，如果不合适则选次之的节点*/
 			
-			DTNHost prevHost = minHost;
+			ArrayList<Tuple<DTNHost, Double>> distanceList = new ArrayList<Tuple<DTNHost, Double>>();//用于接下来存储计算得到的距离信息，并根据此记录排序
+			HashMap<DTNHost, hostInfo> hostInfoList = new HashMap<DTNHost, hostInfo>();
 			
-			List<DTNHost> neiList = GN.getNeighbors(prevHost, arrivalTime.get(prevHost));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
-			Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime = GN.getFutureNeighbors(neiList, prevHost, arrivalTime.get(prevHost));
+			/*获取源集合中指定host节点的邻居节点(包括当前和未来邻居)--时间点为预估到达此host的时间prevTime*/
+			List<DTNHost> neiList = GN.getNeighbors(this.getHost(), arrivalTime.get(this.getHost()));		
+			Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime = GN.getFutureNeighbors(neiList, this.getHost(), arrivalTime.get(this.getHost()));
+			/*获取源集合中host节点的邻居节点(包括当前和未来邻居)----通过Grid进行的预测，所以存在一定的误差*/
 			
 			HashMap<DTNHost, List<Double>> startTime = predictTime.getKey();
 			HashMap<DTNHost, List<Double>> leaveTime = predictTime.getValue();
-			
 			List<DTNHost> neighborNodes= new ArrayList<DTNHost>(startTime.keySet());//得到prevHost上一跳的邻居节点//startTime.keySet()包含了所有的邻居节点，包含未来的邻居节点
 			
+			double minDistance = GN.calculateDistance(this.getHost(), msg.getTo(), SimClock.getTime(), SimClock.getTime() + this.msgTtl);
+			//double minDistance = 100000;
+			double waitTime = 0;
+			double minWaitTime = 0;
+			
+			distanceList.add(new Tuple<DTNHost, Double>(this.getHost(), minDistance));
+			hostInfoList.put(this.getHost(), new hostInfo(this.getHost(), minDistance, SimClock.getTime(), 0));
 			for (DTNHost host : neighborNodes){
-				double waitTime = 0;
-				if (searchedSet.contains(host))
+				waitTime = 0;
+				/*neiHosts记录了当前可以连接的邻居节点，通过connection列表获取*/
+				if (arrivalTime.get(this.getHost()) < startTime.get(host).get(0) && !neiHosts.contains(host))//如果确实是一个当前就存在的未来的节点，就不必用starttime时间来判断了
+					waitTime = startTime.get(host).get(0) - arrivalTime.get(this.getHost());//如果为真，则为一个未来到达的节点，需要有等待延时
+				double time = arrivalTime.get(this.getHost()) + msg.getSize()/host.getInterface(1).getTransmitSpeed() + waitTime;
+				System.out.println(this.getHost()+" to "+msg.getTo()+" of msg "+msg.getId()+"  and the next hop  "+host+"  time is: " + time);
+				if (SimClock.getTime() + time > SimClock.getTime() + msg.getTtl()*60){
+					System.out.println("expire TTL!!! TTL is:  "+(SimClock.getTime() + msg.getTtl()*60));
 					continue;
-				if (prevTime < startTime.get(host).get(0))
-					waitTime = startTime.get(host).get(0) - prevTime;//如果为真，则为一个未来到达的节点，需要有等待延时
-				double time = prevTime + msg.getSize()/host.getInterface(1).getTransmitSpeed() + waitTime;
-				
-				double distance = GN.calculateDistance(this.getHost(), host, time, time+this.msgTtl);
-				if (distance <= minDistance){
-					if (random.nextBoolean() == true && distance - minDistance < 0.1){//如果碰到一样距离的节点，就随机选一个
-						minDistance = distance;
-						minHost = host;
-						minTime = time;
-						prevTime = minTime;
-					}
 				}
-				searchedSet.add(host);//代表已经搜索过的节点	
+				//超过TTL时间的下一跳都会被直接剔除
+				double distance = GN.calculateDistance(host, msg.getTo(), time, time + this.msgTtl);
+				Tuple<DTNHost, Double> t = new Tuple<DTNHost, Double>(host, distance);
+				distanceList.add(t);
+				
+				hostInfo info = new hostInfo(host, distance, time, waitTime);
+				hostInfoList.put(host, info);
 			}
-			waitTime > 0 ? path.add(new Tuple<Integer, Boolean>(minHost, true)) : path.add(new Tuple<Integer, Boolean>(minHost, false));//每一跳搜索完之后，记录路由路径
-			if (GN.getNeighbors(minHost, minTime).contains(msg.getTo())){
-				this.routerTable.put(msg.getTo(), path);
-				break;//找到一条能到达目的节点的路径就退出
+			/*冒泡排序*/
+			System.out.println(distanceList);
+			hostInfoList.get(this.getHost()).sort(distanceList);
+			System.out.println(distanceList);
+			/*冒泡排序*/
+			if (distanceList.get(0).getKey() != this.getHost()){//即有到目的节点更近的邻居节点
+				DTNHost nextHop = distanceList.get(0).getKey();
+				path.add(hostInfoList.get(nextHop).getWaitTime() > 0 ? 
+						new Tuple<Integer, Boolean>(nextHop.getAddress(), true) : 
+							new Tuple<Integer, Boolean>(nextHop.getAddress(), false));//每一跳搜索完之后，记录路由路径
+				arrivalTime.put(nextHop, hostInfoList.get(nextHop).getTime());
+				this.routerTable.put(msg.getTo(), path);//此时只找下一跳节点，至于能否找到具体到达目的节点路径，不关心
+				System.out.println("1 minHost is: "+nextHop+"   now the path is: "+path);
 			}
+			else{//说明自身节点已经是和目的节点相聚最近的节点了（就算有未来可能遇到的邻居节点离目的节点更近，也一定超过了TTL所以才能走到这里）
+				//此时我们在本节点保留一份，在有机会时发往目的节点，同时选择次近的节点再发一份
+				if (distanceList.size() >= 2){//即保证除了自身以外还有可用邻居节点
+					for (int i = 1; i < distanceList.size(); i++){
+						if (distanceList.get(i).getKey() != this.getHost() && !msg.getHops().contains(distanceList.get(i).getKey())){//保证不走回头路
+							DTNHost nextHop = distanceList.get(i).getKey();
+							path.add(hostInfoList.get(nextHop).getWaitTime() > 0 ? 
+									new Tuple<Integer, Boolean>(nextHop.getAddress(), true) : 
+										new Tuple<Integer, Boolean>(nextHop.getAddress(), false));//每一跳搜索完之后，记录路由路径
+							this.routerTable.put(msg.getTo(), path);//此时只找下一跳节点，至于能否找到具体到达目的节点路径，不关心
+							System.out.println("2 minHost is: "+nextHop+"   now the path is: "+path);
+							return;//找到一个下一跳节点之后就返回
+						}
+					}
+				}				
+				System.out.println("没有更新更近的节点");
+				/*待修改，添加多播部分代码*/
+			}
+				/*新方案的测试代码*/
+			break;
 		}
+		case 2:{
+			/*以最短空间距离为路由准则，只搜索具有最短空间距离的的邻居节点作为下一跳(包括预测节点)，同时考虑TTL的限制，如果不合适则选次之的节点*/
 		
-	
-		System.out.println(this.getHost()+" path: "+path+ " to "+msg.getTo()+" time : "+SimClock.getTime());
+			ArrayList<Tuple<DTNHost, Double>> speedList = new ArrayList<Tuple<DTNHost, Double>>();
+			HashMap<DTNHost, hostInfo> hostInfoList = new HashMap<DTNHost, hostInfo>();
+			
+			/*获取源集合中指定host节点的邻居节点(包括当前和未来邻居)--时间点为预估到达此host的时间prevTime*/
+			List<DTNHost> neiList = GN.getNeighbors(this.getHost(), arrivalTime.get(this.getHost()));		
+			Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime = GN.getFutureNeighbors(neiList, this.getHost(), arrivalTime.get(this.getHost()));
+			/*获取源集合中host节点的邻居节点(包括当前和未来邻居)----通过Grid进行的预测，所以存在一定的误差*/
+
+			HashMap<DTNHost, List<Double>> startTime = predictTime.getKey();
+			HashMap<DTNHost, List<Double>> leaveTime = predictTime.getValue();
+			List<DTNHost> neighborNodes= new ArrayList<DTNHost>(startTime.keySet());//得到prevHost上一跳的邻居节点//startTime.keySet()包含了所有的邻居节点，包含未来的邻居节点
+			
+			double minDistance = GN.calculateDistance(this.getHost(), msg.getTo(), SimClock.getTime(), SimClock.getTime() + this.msgTtl);
+			//double minDistance = 100000;
+			double waitTime = 0;
+			double minWaitTime = 0;
+			
+			/**添加自身节点的值作为基准**/
+			speedList.add(new Tuple<DTNHost, Double>(this.getHost(), 0.0));
+			hostInfoList.put(this.getHost(), new hostInfo(this.getHost(), 0, SimClock.getTime(), 0));
+			for (DTNHost host : neighborNodes){
+				waitTime = 0;
+				/*neiHosts记录了当前可以连接的邻居节点，通过connection列表获取*/
+				if (arrivalTime.get(this.getHost()) < startTime.get(host).get(0) && !neiHosts.contains(host))//如果确实是一个当前就存在的未来的节点，就不必用starttime时间来判断了
+					waitTime = startTime.get(host).get(0) - arrivalTime.get(this.getHost());//如果为真，则为一个未来到达的节点，需要有等待延时
+				double time = arrivalTime.get(this.getHost()) + msg.getSize()/host.getInterface(1).getTransmitSpeed() + waitTime;
+				System.out.println(this.getHost()+" to "+msg.getTo()+" of msg "+msg.getId()+"  and the next hop  "+host+"  time is: " + time);
+				if (SimClock.getTime() + time > SimClock.getTime() + msg.getTtl()*60){
+					System.out.println("expire TTL!!! TTL is:  "+(SimClock.getTime() + msg.getTtl()*60));
+					continue;
+				}
+				//超过TTL时间的下一跳都会被直接剔除
+				double distance = GN.calculateDistance(host, msg.getTo(), time, time + this.msgTtl);
+				double speed = (minDistance - distance)/(time - SimClock.getTime());
+				Tuple<DTNHost, Double> t = new Tuple<DTNHost, Double>(host, speed);
+				speedList.add(t);
+				
+				hostInfo info = new hostInfo(host, speed, time, waitTime);
+				hostInfoList.put(host, info);
+			}
+			/*冒泡排序*/
+			hostInfoList.get(this.getHost()).sortSpeed(speedList);
+			/*冒泡排序*/
+			if (speedList.get(0).getKey() != this.getHost() && !msg.getHops().contains(speedList.get(0).getKey())){//即有到目的节点更近的邻居节点//msg.getHops()记录msg已经经过的节点
+				DTNHost nextHop = speedList.get(0).getKey();
+				path.add(hostInfoList.get(nextHop).getWaitTime() > 0 ? 
+						new Tuple<Integer, Boolean>(nextHop.getAddress(), true) : 
+							new Tuple<Integer, Boolean>(nextHop.getAddress(), false));//每一跳搜索完之后，记录路由路径
+				arrivalTime.put(nextHop, hostInfoList.get(nextHop).getTime());
+				this.routerTable.put(msg.getTo(), path);//此时只找下一跳节点，至于能否找到具体到达目的节点路径，不关心
+				System.out.println("1 minHost is: "+nextHop+"   now the path is: "+path);
+			}
+			else{//说明自身节点已经是和目的节点相聚最近的节点了（就算有未来可能遇到的邻居节点离目的节点更近，也一定超过了TTL所以才能走到这里）
+				//此时我们在本节点保留一份，在有机会时发往目的节点，同时选择次近的节点再发一份
+				if (speedList.size() >= 2){//即保证除了自身以外还有可用邻居节点
+					for (int i = 1; i < speedList.size(); i++){
+						if (speedList.get(i).getKey() != this.getHost() && !msg.getHops().contains(speedList.get(i).getKey())){//保证不走回头路
+							DTNHost nextHop = speedList.get(i).getKey();
+							path.add(hostInfoList.get(nextHop).getWaitTime() > 0 ? 
+									new Tuple<Integer, Boolean>(nextHop.getAddress(), true) : 
+										new Tuple<Integer, Boolean>(nextHop.getAddress(), false));//每一跳搜索完之后，记录路由路径
+							this.routerTable.put(msg.getTo(), path);//此时只找下一跳节点，至于能否找到具体到达目的节点路径，不关心
+							System.out.println("2 minHost is: "+nextHop+"   now the path is: "+path);
+							
+							/*实现信息的多重拷贝传输*/
+							if (msg.getProperty("MultiCopy") == null){//代表是第一次多重拷贝
+								msg.updateProperty("MultiCopy", true);
+								msg.updateProperty("MultiCopyInfo_minDistance", hostInfoList.get(nextHop).getdistance());//记录此时的最短距离
+							}
+							else{
+								assert msg.getProperty("MultiCopyInfo_minDistance") != null : "MultiCopy error!!!" ;
+								if ((double)msg.getProperty("MultiCopyInfo_minDistance") > hostInfoList.get(nextHop).getdistance()){
+									msg.updateProperty("MultiCopyInfo_minDistance", hostInfoList.get(nextHop).getdistance());
+								}
+								else
+									msg.updateProperty("MultiCopy", false);//代表不是距离最短节点，因此不能在此节点上不能多重拷贝
+							}
+							/*实现信息的多重拷贝传输*/
+							return;//找到一个下一跳节点之后就返回
+						}
+					}
+				}			
+				//System.out.println("没有更新更近的节点");
+			}			
+			break;
+		}
+		case 3:{
+			/*以距离矢量为最小优化目标的最短距离搜索算法*/
+			while(iteratorTimes < size && updateLabel == true){//设定算法执行循环的终止条件：1.超过N次（N为总节点个数）；2.上一次更新中没有找到合适的下一跳节点
+				double minDistance = 100000;
+				updateLabel = false;		
+				DTNHost prevHost = minHost;					
+				
+				//List<DTNHost> neiList = GN.getNeighbors(prevHost, SimClock.getTime() + prevTime);//获取源集合中指定host节点的邻居节点(包括当前和未来邻居)--时间点为预估到达此host的时间prevTime
+				//Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime = GN.getFutureNeighbors(neiList, prevHost, SimClock.getTime() + prevTime);//获取源集合中host节点的邻居节点(包括当前和未来邻居)	
+				List<DTNHost> neiList = GN.getNeighbors(prevHost, arrivalTime.get(prevHost));//获取源集合中指定host节点的邻居节点(包括当前和未来邻居)--时间点为预估到达此host的时间prevTime			
+				Tuple<HashMap<DTNHost, List<Double>>, HashMap<DTNHost, List<Double>>> predictTime = GN.getFutureNeighbors(neiList, prevHost, arrivalTime.get(prevHost));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
+
+				HashMap<DTNHost, List<Double>> startTime = predictTime.getKey();
+				HashMap<DTNHost, List<Double>> leaveTime = predictTime.getValue();
+				
+				List<DTNHost> neighborNodes= new ArrayList<DTNHost>(startTime.keySet());//得到prevHost上一跳的邻居节点//startTime.keySet()包含了所有的邻居节点，包含未来的邻居节点
+				neighborNodes.addAll(neiList);
+//				/*判断是否还有有效的下一跳节点*/
+//				if (searchedSet.containsAll(neighborNodes)){
+//					for (Tuple<Integer, Boolean> thisHop : path){
+//						DTNHost thisNode = this.getHostFromAddress(thisHop.getKey());//由int地址找到对应的DTNHost节点
+//						HashMap<DTNHost, List<Double>> neighborMap = GN.getFutureNeighbors(neiList, prevHost, SimClock.getTime() + prevTime).getKey();
+//						if (neighborMap.containsKey(msg.getTo()))
+//							/*在无法直接送达目的节点的情况下，看源节点是否有机会在TTL之前将信息送到目的节点*/
+//							if (neighborMap.get(msg.getTo()).get(0) < msg.getTtl()*60){
+//								path.clear();
+//								path.add(new Tuple<Integer, Boolean>(msg.getTo().getAddress(), true));
+//								routerTable.put(msg.getTo(), path);
+//							}		
+//							/*在无法直接送达目的节点的情况下，看源节点是否有机会在TTL之前将信息送到目的节点*/
+//					}
+//					break;//在无法搜到直接到达目的节点的路径的情况下，跳出路由算法
+//				}
+//				/*判断是否还有有效的下一跳节点*/
+				
+				if (!neiList.containsAll(predictTime.getKey().keySet())){
+					System.out.println("  this node is: "+this.getHost()+" and all neighbors of  "+prevHost+" is "+predictTime.getKey().keySet());
+				}
+				
+				double waitTime = 0;
+				for (DTNHost host : neighborNodes){
+					waitTime = 0;
+					if (searchedSet.contains(host))
+						continue;
+					System.out.println("neighbors :"+ neiList);
+					if (arrivalTime.get(prevHost) < startTime.get(host).get(0) && !neiList.contains(host))//如果确实是一个当前就存在的未来的节点，就不必用starttime时间来判断了
+						waitTime = startTime.get(host).get(0) - arrivalTime.get(prevHost);//如果为真，则为一个未来到达的节点，需要有等待延时
+					double time = arrivalTime.get(prevHost) + msg.getSize()/host.getInterface(1).getTransmitSpeed() + waitTime;
+					System.out.println("this time is : "+ host + " and simtime is: "+ SimClock.getTime() +" transmission time is: "+time +"  "+ arrivalTime.get(prevHost) +"  "+ waitTime);
+					if (SimClock.getTime() + time > SimClock.getTime() + msg.getTtl()*60){
+						System.out.println("expire TTL!!! TTL is:  "+(SimClock.getTime() + msg.getTtl()*60));
+						continue;
+					}
+						
+					double distance = GN.calculateDistance(host, msg.getTo(), time, time+this.msgTtl);
+					
+					if (distance <= minDistance){
+						if (random.nextBoolean() == true && distance - minDistance < 0.01){//如果碰到一样距离的节点，就随机选一个
+							minDistance = distance;
+							minHost = host;
+							minTime = time;
+							updateLabel = true;
+						}
+					}
+					searchedSet.add(host);//代表已经搜索过的节点	
+				}		
+				if (updateLabel == true){
+					path.add(waitTime > 0 ? 
+							new Tuple<Integer, Boolean>(minHost.getAddress(), true) : 
+								new Tuple<Integer, Boolean>(minHost.getAddress(), false));//每一跳搜索完之后，记录路由路径
+					arrivalTime.put(minHost, SimClock.getTime() + minTime);
+					this.routerTable.put(minHost, path);//按照最短路径准则找到的通往minHost的一跳路径
+					System.out.println("minHost is: "+minHost+"   now the path is: "+path+" searchedSet is: "+searchedSet);
+				}
+				/*判断是否找到到达目的节点的路径*//*
+				if (GN.getNeighbors(minHost, SimClock.getTime() + minTime).contains(msg.getTo())){
+					path.add(new Tuple<Integer, Boolean>(msg.getTo().getAddress(), false));
+					this.routerTable.put(msg.getTo(), path);
+					break;//找到一条能到达目的节点的路径就退出
+				}
+				if (minHost == msg.getTo()){
+					this.routerTable.put(msg.getTo(), path);
+					break;//找到一条能到达目的节点的路径就退出
+				}
+				/*判断是否找到到达目的节点的路径*/
+				
+				if (routerTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
+				break;
+				iteratorTimes++;
+			}
+			/*以距离矢量为最小优化目标的最短距离搜索算法*/
+			break;
+		}
+		}
+
+		
+
+		
+		//System.out.println(this.getHost()+" path: "+path+ " to "+msg.getTo()+" time : "+SimClock.getTime());
 //		
 //		while(true){//Dijsktra算法思想，每次历遍全局，找时延最小的加入路由表，保证路由表中永远是时延最小的路径
 //			if (iteratorTimes >= size || updateLabel == false)
@@ -822,7 +1070,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		private int gridLayer;//层数，即决定了网格划分的精细程度
 		
 		private List<GridCell[][][]> GridList = new ArrayList<GridCell[][][]>();
-		private HashMap<Double, HashMap<NetworkInterface, GridCell>> gridmap = new HashMap<Double, HashMap<NetworkInterface, GridCell>>();
+		private HashMap<Double, HashMap<NetworkInterface, GridCell>> gridmap = new HashMap<Double, HashMap<NetworkInterface, GridCell>>();//记录TTL时间内，每个时间点，各个节点和网格的对应关系
 		private HashMap<Double, HashMap<GridCell, List<DTNHost>>> cellmap = new HashMap<Double, HashMap<GridCell, List<DTNHost>>>();
 		
 		/*用于初始化时，计算各个节点在一个周期内的网格坐标*/
@@ -894,35 +1142,60 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		/**
 		 * 遍歷所有節點，對每個節點遍歷一個週期，記錄其一個週期內遍歷過的網格，并找到對應的進入和離開時間
 		 */
-		public void initializeGridLocation(){	
+		public Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>>
+				initializeGridLocation(boolean firstCalculationLable, Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>> gridInfo){
+			/*精简初始化过程，因为每个节点计算这一过程是重复的，所以只计算一次，后面的都复制第一次计算的结果即可*/
+			if (firstCalculationLable != true){
+				gridLocation = gridInfo.getKey();
+				gridTime = gridInfo.getValue();
+				//System.out.println(" copy "+gridLocation.get(this.getHost()) );
+				return gridInfo;
+			}
+			/*精简初始化过程，因为每个节点计算这一过程是重复的，所以只计算一次，后面的都复制第一次计算的结果即可*/
+			
+			Coord location = new Coord(0, 0);
+			
 			this.host.getHostsList();
 			for (DTNHost h : this.host.getHostsList()){//對每個節點遍歷一個週期，記錄其一個週期內遍歷過的網格，并找到對應的進入和離開時間
 				double period = getPeriodofOrbit(h);
 				this.periodMap.put(h, period);
-				System.out.println(this.host+" now calculate "+h+"  "+period);
+				System.out.println(this.host+" now calculate "+h+" orbit period: "+period);
 				
 				List<GridCell> gridList = new ArrayList<GridCell>();
 				List<Double> intoTime = new ArrayList<Double>();
 				List<Double> outTime = new ArrayList<Double>();
-				GridCell startCell;//记录起始网格
+				GridCell startCell = new GridCell();//记录起始网格
 				for (double time = 0; time < period; time += updateInterval){
-					Coord c = h.getCoordinate(time);
-					GridCell gc = cellFromCoord(c);//根據坐標找到對應的網格
+								
+					/**测试代码**/
+					//Coord c = h.getCoordinate(time);
+					//GridCell gc = cellFromCoord(c);//根據坐標找到對應的網格
+										
+					location.setLocation3D(((SatelliteMovement)h.getMovementModel()).getSatelliteCoordinate(time));
+					GridCell gc = cellFromCoord(location);
+					/**测试代码**/
+					
 					if (!gridList.contains(gc)){
 						if (gridList.isEmpty())
 							startCell = gc;//记录起始网格
 						gridList.add(gc);//第一次检测到节点进入此网格（注意，边界检查！！！开始和结束的时候！！！!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!）
 						intoTime.add(time);//记录相应的进入时间
 					}	
-					else{
-						//if (gc. == startCell)
-							//intoTime = time;
-					}
+					/**注意，在第一次添加过gc到gridlist之后，有很长一段时间都会呈现gridList.contains(gc)==ture的情况，所以这里else情况下不必在做其它判断或动作**/
+//					else{		
+//						//if (gc == startCell)
+//							//System.out.println(gc+"  "+time+"  "+period);
+//						//else
+//							//System.out.println(gc+" error "+time+"  "+period);
+//							//intoTime = time;
+//					}				
 				}
 				gridLocation.put(h, gridList);//遍历完一个节点就记录下来
-				gridTime.put(h, intoTime);
-			}
-			System.out.println(gridLocation);
+				gridTime.put(h, intoTime);//对应的时间
+			}					
+			//System.out.println(gridLocation);
+			return new 
+					Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>>(gridLocation, gridTime);			
 		}
 		/**
 		 * 獲取指定衛星節點的運行週期時間
@@ -944,7 +1217,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		public double calculateDistance(DTNHost source, DTNHost destination, double startTime, double endTime){		
 			List<GridCell> p1 = gridLocation.get(source);//指定节点一个周期内经过的网格列表
 			List<GridCell> p2 = gridLocation.get(destination);
-			System.out.println(gridTime+"  "+source+"  "+destination);
+			
 			List<Double> t1 = gridTime.get(source);//指定节点在经过这些网格时对应的时间
 			List<Double> t2 = gridTime.get(destination);
 			
@@ -973,7 +1246,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 				}			
 			}
 			//有问题，待修改！！！！！！！！！！！！！！！
-	
+			//System.out.println("  "+source+"  "+destination+" distance is: "+distance);
 			return distance;
 		}
 		
@@ -1016,8 +1289,35 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 				//assert false :"超出预测时间";
 				time = SimClock.getTime()+msgTtl*60;
 			}
+			HashMap<NetworkInterface, GridCell> ginterfaces = gridmap.get(time);//获取指定时刻，全局节点和网格的映射表
+			GridCell cell = ginterfaces.get(host.getInterface(1));
+			int[] number = cell.getNumber();
+
+			List<GridCell> cellList = getNeighborCells(time, number[0], number[1], number[2]);//所有邻居的网格（当前时刻）
+			List<DTNHost> hostList = new ArrayList<DTNHost>();//(邻居网格内的节点集合)
+
+			assert cellmap.containsKey(time):" 时间错误 ";
+			for (GridCell c : cellList){
+				if (cellmap.get(time).containsKey(c)){//如果不包含，这说明此邻居网格为空，里面不含任何节点
+					hostList.addAll(cellmap.get(time).get(c));
+				}
+			}	
+			if (hostList.contains(host))//把自身节点去掉
+				hostList.remove(host);
+
+			return hostList;
+		}
+		
+		public List<DTNHost> getNeighborsNow(DTNHost host, double time){//获取指定时间的邻居节点(同时包含预测到TTL时间内的邻居)
+			int num = (int)((time-SimClock.getTime())/updateInterval);
+			time = SimClock.getTime()+num*updateInterval;
+			
+			if (time > SimClock.getTime()+msgTtl*60){//检查输入的时间是否超过预测时间
+				//assert false :"超出预测时间";
+				time = SimClock.getTime()+msgTtl*60;
+			}
 				
-			HashMap<NetworkInterface, GridCell> ginterfaces = gridmap.get(time);
+			HashMap<NetworkInterface, GridCell> ginterfaces = gridmap.get(time);//获取指定时刻，全局节点和网格的映射表
 			GridCell cell = ginterfaces.get(host.getInterface(1));
 			int[] number = cell.getNumber();
 			
@@ -1034,6 +1334,14 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			return hostList;
 		}
 		
+		/**
+		 * 需要与getNeighbors(DTNHost host, double time)函数所返回的当前时间邻居参数配合使用；
+		 * 找出未来时间内指定节点的未来相遇邻居，并返回所有会相遇邻居的列表(当前和未来的)
+		 * @param neiList
+		 * @param host
+		 * @param time
+		 * @return
+		 */
 		public Tuple<HashMap<DTNHost, List<Double>>, //neiList 为已经计算出的当前邻居节点列表
 			HashMap<DTNHost, List<Double>>> getFutureNeighbors(List<DTNHost> neiList, DTNHost host, double time){
 			int num = (int)((time-SimClock.getTime())/updateInterval);
@@ -1049,8 +1357,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			
 			List<DTNHost> futureList = new ArrayList<DTNHost>();//(邻居网格内的未来节点集合)
 			List<NetworkInterface> futureNeiList = new ArrayList<NetworkInterface>();//(预测未来邻居的节点集合)
-			
-			
+					
 			Collection<DTNHost> temporalNeighborsBefore = startTime.keySet();//前一时刻的邻居，通过交叉对比这一时刻的邻居，就知道哪些是新加入的，哪些是新离开的			
 			Collection<DTNHost> temporalNeighborsNow = new ArrayList<DTNHost>();//用于记录当前时刻的邻居
 			for (; time < SimClock.getTime() + msgTtl*60; time += updateInterval){
@@ -1331,31 +1638,36 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		 */
 		public void updateGrid_without_OrbitCalculation(){
 			if (gridLocation.isEmpty())//初始化只执行一次
-				initializeGridLocation();
-			
+				System.out.println("girdInfo errors!  "+gridLocation);
+				//initializeGridLocation();
+			if (periodMap.isEmpty()){
+				for (DTNHost h : hosts){//對每個節點遍歷一個週期，記錄其一個週期內遍歷過的網格，并找到對應的進入和離開時間
+					double period = getPeriodofOrbit(h);
+					this.periodMap.put(h, period);
+				}	
+			}
 			ginterfaces.clear();//每次清空
 			//Coord location = new Coord(0,0); 	// where is the host
 			double simClock = SimClock.getTime();
-			
 			for (double time = simClock; time <= simClock + msgTtl*60; time += updateInterval){
 				HashMap<GridCell, List<DTNHost>> cellToHost= new HashMap<GridCell, List<DTNHost>>();
 				for (DTNHost host : hosts){
-					List<GridCell> gridCellList = this.gridLocation.get(host);
-					List<Double> timeList = this.gridTime.get(host);
-					double period = this.periodMap.get(host);
+					List<GridCell> gridCellList = this.gridLocation.get(host);//获取节点host在一个轨道周期内的所经历过的网格列表
+					List<Double> timeList = this.gridTime.get(host);//经历这些网格所对应的时间（在一个周期内）
+					double period = this.periodMap.get(host);//对应的轨道周期 
 					double t0 = time;
 					GridCell cell = new GridCell();
 					boolean label = false;
-					int iterator = 0;
 					if (time >= period)
 						t0 = t0 % period;//大于周期就取余操作
-					for (double t : timeList){
-						if (t >= t0){
+					assert timeList.size() == gridCellList.size() : " Size of Grid Table doesn't match!!! ";
+					for (int iterator = 0; iterator < timeList.size(); iterator++){
+						if (timeList.get(iterator) >= t0){
 							cell = gridCellList.get(iterator);
 							label = true;
 							break;
 						}
-						iterator++;//找到与timeList时间对应的网格所在位置,iterator 代表在这两个list中的指针						
+						//iterator++;//找到与timeList时间对应的网格所在位置,iterator 代表在这两个list中的指针						
 					}				
 					//System.out.println(host+" number "+cell.getNumber()[0]+cell.getNumber()[1]+cell.getNumber()[2]);
 					//System.out.println(host+" error!!! "+label);
@@ -1374,7 +1686,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 				gridmap.put(time, ginterfaces);//预测未来time时间里节点和网格之间的对应关系
 				//ginterfaces.clear();//每次清空
 				ginterfaces = new HashMap<NetworkInterface, GridCell>();//每次清空
-				//CreateGrid(cellSize);//包含cells的new和ginterfaces的new
+				//CreateGrid(cellSize);//包含cells的new和ginterfaces的new				
 			}
 		}
 		
@@ -1410,8 +1722,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 				//ginterfaces.clear();//每次清空
 				ginterfaces = new HashMap<NetworkInterface, GridCell>();//每次清空
 				//CreateGrid(cellSize);//包含cells的new和ginterfaces的new
-			}
-			
+			}			
 		}
 		
 		
@@ -1429,9 +1740,8 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			int row = (int)(c.getY()/cellSize) + 1; 
 			int col = (int)(c.getX()/cellSize) + 1;
 			int z = (int)(c.getZ()/cellSize) + 1;
-			assert row > 0 && row <= rows && col > 0 && col <= cols : "Location " + 
-			c + " is out of world's bounds";
-		
+			assert row > 0 && row <= rows && col > 0 && col <= cols && z > 0 && z <= zs
+					: "Location " + c + " is out of world's bounds";		
 			return this.cells[row][col][z];
 		}
 		
@@ -1466,6 +1776,78 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			}
 		}
 	}
+	
+	/**
+	 * 用在gridSearch，路由搜索算法中，主要用于存储计算得到的中间节点的距离信息，并用于后续排序
+	 */
+	public class hostInfo{
+		
+		DTNHost host;
+		double distance;
+		double time;
+		double waitTime;
+		public hostInfo(DTNHost host, double distance, double time, double waitTime){
+			this.host = host;
+			this.distance = distance;
+			this.time = time;
+			this.waitTime = waitTime;
+		}
+		/**
+		 * 冒泡排序
+		 * @param distanceList
+		 * @return
+		 */
+		public ArrayList<Tuple<DTNHost, Double>> sort(ArrayList<Tuple<DTNHost, Double>> distanceList){
+			for (int j = 0; j < distanceList.size(); j++){
+				for (int i = 0; i < distanceList.size() - j - 1; i++){
+					if (distanceList.get(i).getValue() > distanceList.get(i + 1).getValue()){//从小到大，大的值放在队列右侧
+						Tuple<DTNHost, Double> var1 = distanceList.get(i);
+						Tuple<DTNHost, Double> var2 = distanceList.get(i + 1);
+						distanceList.remove(i);
+						distanceList.remove(i);//注意，一旦执行remove之后，整个List的大小就变了，所以原本i+1的位置现在变成了i
+						//注意顺序
+						distanceList.add(i, var2);
+						distanceList.add(i + 1, var1);
+					}
+				}
+			}
+			return distanceList;
+		}
+		/**
+		 * 冒泡排序
+		 * @param distanceList
+		 * @return
+		 */
+		public ArrayList<Tuple<DTNHost, Double>> sortSpeed(ArrayList<Tuple<DTNHost, Double>> speedList){
+			for (int j = 0; j < speedList.size(); j++){
+				for (int i = 0; i < speedList.size() - j - 1; i++){
+					if (speedList.get(i).getValue() < speedList.get(i + 1).getValue()){//从小到大，大的值放在队列右侧
+						Tuple<DTNHost, Double> var1 = speedList.get(i);
+						Tuple<DTNHost, Double> var2 = speedList.get(i + 1);
+						speedList.remove(i);
+						speedList.remove(i);//注意，一旦执行remove之后，整个List的大小就变了，所以原本i+1的位置现在变成了i
+						//注意顺序
+						speedList.add(i, var2);
+						speedList.add(i + 1, var1);
+					}
+				}
+			}
+			return speedList;
+		}
+		public double getTime(){
+			return this.time;
+		}
+		public double getWaitTime(){
+			return this.waitTime;
+		}
+		public double getdistance(){
+			return this.distance;
+		}
+		public DTNHost getHost(){
+			return this.host;
+		}
+	}
 }
+
 
   

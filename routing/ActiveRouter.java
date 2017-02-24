@@ -498,8 +498,7 @@ public abstract class ActiveRouter extends MessageRouter {
 			if (con.getOtherNode(getHost()).requestDeliverableMessages(con)) {//Ä¬ÈÏ·µ»Øfalse
 				return con;
 			}
-		}
-		
+		}	
 		return null;
 	}
 
