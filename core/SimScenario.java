@@ -17,6 +17,7 @@ import java.util.Random;
 
 import movement.MapBasedMovement;
 import movement.MovementModel;
+import movement.SatelliteMovement;
 import movement.map.SimMap;
 import routing.MessageRouter;
 import routing.ShortestDistanceSpaceRouter.GridNeighbors.GridCell;
@@ -462,6 +463,7 @@ public class SimScenario implements Serializable {
 			}		
 		return hostsinthisCreation;
 	}
+	
 	/**
 	 * Creates hosts for the scenario
 	 */
@@ -500,8 +502,10 @@ public class SimScenario implements Serializable {
 					gridInfo = host.initialzationRouter(firstCalculationLable, gridInfo);//路由初始化
 					firstCalculationLable = false;
 				}
-				else
+				else{
 					host.initialzationRouter(firstCalculationLable, gridInfo);
+				}
+
 				/*因为每个节点的初始化计算过程一样，所以精简这一过程，只计算一次，后面的复制即可*/
 			}
 			break;
@@ -584,9 +588,10 @@ public class SimScenario implements Serializable {
 		//int NROF_PLANE = 3;//轨道平面数
 		int NROF_S_EACHPLANE = NROF_SATELLITES/NROF_PLANE;//每个轨道平面上的节点数
 		
-		Random random = new Random();
+		//Random random = new Random();
 		//parameters[0]= random.nextInt(9000)%(2000+1) + 2000;
-		parameters[0]= 7850;
+		/**地球半径为6371km**/
+		parameters[0]= 6371 + 785;//单位是km
 		//this.parameters[0]=8000.0;
 		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
 		parameters[2]= 90;
@@ -610,9 +615,10 @@ public class SimScenario implements Serializable {
 		//int NROF_PLANE = 3;//轨道平面数
 		int NROF_S_EACHPLANE = NROF_SATELLITES/NROF_PLANE;//每个轨道平面上的节点数
 		
-		Random random = new Random();
+		//Random random = new Random();
 		//parameters[0]= random.nextInt(9000)%(2000+1) + 2000;
-		parameters[0]= 15000;
+		/**地球半径为6371km**/
+		parameters[0]= 6371 + 1500;//单位是km
 		//this.parameters[0]=8000.0;
 		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
 		parameters[2]= 90;

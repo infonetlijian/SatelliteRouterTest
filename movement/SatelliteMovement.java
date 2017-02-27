@@ -100,11 +100,18 @@ public class SatelliteMovement extends MovementModel{
 		double[][] coordinate = new double[1][3];
 		double[] xyz = new double[3];
 		
-		coordinate = satelliteOrbit.getSatelliteCoordinate(time);
+		Settings s = new Settings("MovementModel");
+		int worldSize[] = s.getCsvInts("worldSize");
 		
-		xyz[0] = (coordinate[0][0]+40000);//坐標軸平移
-		xyz[1] = (coordinate[0][1]+40000);
-		xyz[2] = (coordinate[0][2]+40000);
+		coordinate = satelliteOrbit.getSatelliteCoordinate(time);
+		/**ONE中的距离单位为meter，但是JAT中的轨道半径单位为km，因此在得到的坐标中应该*1000进行转换**/
+//		xyz[0] = (coordinate[0][0]*1000 + worldSize/2);//坐標軸平移
+//		xyz[1] = (coordinate[0][1]*1000 + worldSize/2);
+//		xyz[2] = (coordinate[0][2]*1000 + worldSize/2);
+		/**ONE中的距离单位为meter，但是JAT中的轨道半径单位为km，因此此做统一缩放，将ONE中的距离单位也视作km，同时坐标平移量保持为world大小的一半**/
+		xyz[0] = (coordinate[0][0] + worldSize[0]/2);//坐標軸平移
+		xyz[1] = (coordinate[0][1] + worldSize[0]/2);
+		xyz[2] = (coordinate[0][2] + worldSize[0]/2);
 		
 		return xyz;
 	}

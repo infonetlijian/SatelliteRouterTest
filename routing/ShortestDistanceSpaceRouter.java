@@ -540,6 +540,8 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			/**添加自身节点的值作为基准**/
 			speedList.add(new Tuple<DTNHost, Double>(this.getHost(), 0.0));
 			hostInfoList.put(this.getHost(), new hostInfo(this.getHost(), 0, SimClock.getTime(), 0));
+			
+			//neighborNodes.addAll(neiHosts);
 			for (DTNHost host : neighborNodes){
 				waitTime = 0;
 				/*neiHosts记录了当前可以连接的邻居节点，通过connection列表获取*/
@@ -562,6 +564,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			}
 			/*冒泡排序*/
 			hostInfoList.get(this.getHost()).sortSpeed(speedList);
+			System.out.println(speedList);
 			/*冒泡排序*/
 			if (speedList.get(0).getKey() != this.getHost() && !msg.getHops().contains(speedList.get(0).getKey())){//即有到目的节点更近的邻居节点//msg.getHops()记录msg已经经过的节点
 				DTNHost nextHop = speedList.get(0).getKey();
@@ -1129,9 +1132,9 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 			this.cells = new GridCell[rows+2][cols+2][zs+2];
 			this.cellSize = cellSize;
 
-			for (int i=0; i<rows+2; i++) {
-				for (int j=0; j<cols+2; j++) {
-					for (int n=0;n<zs+2; n++){//新增三维变量
+			for (int i=0; i < rows+2; i++) {
+				for (int j=0; j < cols+2; j++) {
+					for (int n=0;n < zs+2; n++){//新增三维变量
 						this.cells[i][j][n] = new GridCell();
 						cells[i][j][n].setNumber(i, j, n);
 					}
@@ -1145,9 +1148,27 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		public Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>>
 				initializeGridLocation(boolean firstCalculationLable, Tuple<HashMap <DTNHost, List<GridCell>>, HashMap <DTNHost, List<Double>>> gridInfo){
 			/*精简初始化过程，因为每个节点计算这一过程是重复的，所以只计算一次，后面的都复制第一次计算的结果即可*/
-			if (firstCalculationLable != true){
-				gridLocation = gridInfo.getKey();
-				gridTime = gridInfo.getValue();
+			/**由this.cells(因为它所在的域是只在每个host的router域内)所引起的问题，待测试！**//*
+			List<GridCell> gl = new ArrayList<GridCell>();
+			List<Double> timeList = new ArrayList<Double>();
+			if (firstCalculationLable != true){			
+				for (DTNHost h : gridInfo.getKey().keySet()){
+					for (int i = 0; i < gridInfo.getKey().get(h).size(); i++){
+						GridCell c = gridInfo.getKey().get(h).get(i);
+						GridCell cell = this.cells[c.getNumber()[0]][c.getNumber()[1]][c.getNumber()[2]];
+						gl.add(cell);
+					}
+					gridLocation.put(h, gl);
+				}
+				for (DTNHost h : gridInfo.getKey().keySet()){
+					for (int i = 0; i < gridInfo.getKey().get(h).size(); i++){
+						double time = gridInfo.getValue().get(h).get(i);
+						timeList.add(time);
+					}
+					gridTime.put(h, timeList);
+				}			
+				//gridLocation.putAll(gridInfo.getKey());				
+				//gridTime.putAll(gridInfo.getValue());
 				//System.out.println(" copy "+gridLocation.get(this.getHost()) );
 				return gridInfo;
 			}
@@ -1162,7 +1183,7 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 				System.out.println(this.host+" now calculate "+h+" orbit period: "+period);
 				
 				List<GridCell> gridList = new ArrayList<GridCell>();
-				List<Double> intoTime = new ArrayList<Double>();
+				List<Double> intoTime = new ArrayList<Double>();//节点进入一个网格的时间点
 				List<Double> outTime = new ArrayList<Double>();
 				GridCell startCell = new GridCell();//记录起始网格
 				for (double time = 0; time < period; time += updateInterval){
@@ -1283,10 +1304,10 @@ public class ShortestDistanceSpaceRouter extends ActiveRouter{
 		 */
 		public List<DTNHost> getNeighbors(DTNHost host, double time){//获取指定时间的邻居节点(同时包含预测到TTL时间内的邻居)
 			int num = (int)((time-SimClock.getTime())/updateInterval);
-			time = SimClock.getTime()+num*updateInterval;
+			time = SimClock.getTime()+num*updateInterval;//时间取整
 			
 			if (time > SimClock.getTime()+msgTtl*60){//检查输入的时间是否超过预测时间
-				//assert false :"超出预测时间";
+				assert false :"超出预测时间";
 				time = SimClock.getTime()+msgTtl*60;
 			}
 			HashMap<NetworkInterface, GridCell> ginterfaces = gridmap.get(time);//获取指定时刻，全局节点和网格的映射表

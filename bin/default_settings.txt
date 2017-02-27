@@ -18,7 +18,7 @@ Scenario.nrofHostGroups = 1
 ## Scenario settings
 Scenario.name = satellite network simulation
 Scenario.simulateConnections = true
-Scenario.updateInterval = 30
+Scenario.updateInterval = 1
 # 43200s == 12h
 Scenario.endTime = 43200
 
@@ -35,7 +35,9 @@ Interface.type = SimpleSatelliteInterface
 #Interface.type = SatelliteLaserInterface
 # Transmit speed of 2 Mbps = 250kBps
 Interface.transmitSpeed = 100k
-Interface.transmitRange = 8000
+#注意：ONE中距离单位是meters
+#由于JAT中距离单位为km，因此我们将ONE中的距离单位统一视为km，这只会在自带的图形界面单位上产生误解
+Interface.transmitRange = 4000
 
 
 
@@ -92,7 +94,7 @@ Group.interface1 = Interface
 # Walking speeds
 Group.speed = 0.5, 1.5
 # Message TTL of 300 minutes (5 hours)
-Group.msgTtl = 60
+Group.msgTtl = 30
 
 #Group.nrofHosts = [10;20;30;40;50]
 Group.nrofHosts = 12
@@ -126,7 +128,7 @@ Events1.prefix = M
 # seed for movement models' pseudo random number generator (default = 0)
 MovementModel.rngSeed = 1
 # World's size for Movement Models without implicit size (width, height; meters)
-MovementModel.worldSize = 100000, 100000
+MovementModel.worldSize = 50000, 50000
 # How long time to move hosts in the world before real simulation
 MovementModel.warmup = 1000
 
