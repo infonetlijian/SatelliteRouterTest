@@ -591,15 +591,15 @@ public class SimScenario implements Serializable {
 		//Random random = new Random();
 		//parameters[0]= random.nextInt(9000)%(2000+1) + 2000;
 		/**地球半径为6371km**/
-		parameters[0]= 6371 + 785;//单位是km
+		parameters[0]= 6371 + 780;//单位是km
 		//this.parameters[0]=8000.0;
 		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
-		parameters[2]= 90;
+		parameters[2]= 86.4;//64.8;
 		//parameters[2] = random.nextInt(15);
 		//parameters[3] = random.nextInt(15);
 		parameters[3]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);//0.0;
 		parameters[4]= (360/NROF_S_EACHPLANE)*((m-(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE) - 1) + (360/NROF_SATELLITES)*(m/NROF_S_EACHPLANE);//0.0;
-		parameters[5]= 0.0;//0.0;
+		parameters[5]= 0;//86.4;//0.0;
 		
 		System.out.println(m);
 		//nrofPlane = m/NROF_S_EACHPLANE + 1;//卫星所属轨道平面编号

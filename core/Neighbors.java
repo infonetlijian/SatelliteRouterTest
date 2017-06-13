@@ -45,7 +45,9 @@ public class Neighbors {
 		
 		HashMap<DTNHost, Coord> loc = new HashMap<DTNHost, Coord>();
 		loc.clear();
-		Coord location = new Coord(0,0); 	// where is the host
+		
+		/**原来的代码中，有优化机制，不符合实际，故而删除**/
+		/*
 		if (!(time == SimClock.getTime())){
 			for (DTNHost h : hosts){//更新指定时刻全局节点的坐标
 				//location.my_Test(time, 0, h.getParameters());
@@ -58,6 +60,17 @@ public class Neighbors {
 			for (DTNHost h : hosts){//更新指定时刻全局节点的坐标
 				loc.put(h, h.getLocation());//记录指定时刻全局节点的坐标
 			}
+		}*/
+		
+		/**实时计算全网节点的坐标构成拓扑图**/
+		for (DTNHost h : hosts){//更新指定时刻全局节点的坐标
+			//location.my_Test(time, 0, h.getParameters());
+			//Coord xyz = new Coord(location.getX(), location.getY(), location.getZ());
+			/**直接获取当前的节点位置，简化计算过程，提高仿真运行速度**/
+			//Coord xyz = h.getCoordinate(time);
+			Coord xyz = h.getLocation();
+			/**直接获取当前的节点位置，简化计算过程**/
+			loc.put(h, xyz);//记录指定时刻全局节点的坐标
 		}
 		
 		Coord myLocation = loc.get(host);
@@ -70,6 +83,7 @@ public class Neighbors {
 			}
 		}
 		//System.out.println(host+" neighbor: "+neiHost+" time: "+time);
+
 		return neiHost;
 	}
 	
@@ -139,7 +153,7 @@ public class Neighbors {
 	public Neighbors(DTNHost host){
 		this.host = host;
 		Settings s = new Settings(INTERFACENAME_S);
-		transmitRange = s.getDouble(TRANSMIT_RANGE_S);//从配置文件中读取传输速率
+		transmitRange = s.getDouble(TRANSMIT_RANGE_S);//从配置文件中读取传输半径
 		Settings set = new Settings(SCENARIONAME_S);
 		simEndTime = set.getDouble(SIMULATION_END_TIME);
 		Settings se = new Settings("Group");

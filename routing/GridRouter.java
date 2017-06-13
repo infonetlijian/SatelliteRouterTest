@@ -870,7 +870,10 @@ public class GridRouter extends ActiveRouter{
 				//assert false :"超出预测时间";
 				time = SimClock.getTime()+msgTtl*60;
 			}
-				
+			
+			double t0 = System.currentTimeMillis();
+			System.out.println(t0);
+			
 			HashMap<NetworkInterface, GridCell> ginterfaces = gridmap.get(time);
 			GridCell cell = ginterfaces.get(host.getInterface(1));
 			int[] number = cell.getNumber();
@@ -884,6 +887,9 @@ public class GridRouter extends ActiveRouter{
 			}	
 			if (hostList.contains(host))//把自身节点去掉
 				hostList.remove(host);
+			
+			double t1 = System.currentTimeMillis();
+			System.out.println("search cost"+(t1-t0));
 			//System.out.println(host+" 邻居列表   "+hostList);
 			return hostList;
 		}
@@ -1003,7 +1009,6 @@ public class GridRouter extends ActiveRouter{
 						for (int k = -3; k <= 3; k += 1){
 							if (boundaryCheck(row+i,col+j,z+k))
 								GC.add(cells[row+i][col+j][z+k]);
-	
 						}
 					}
 				}
@@ -1011,7 +1016,6 @@ public class GridRouter extends ActiveRouter{
 					for (int k = -1; k < 2; k += 1){
 						if (boundaryCheck(row+4,col+j,z+k)){
 							GC.add(cells[row+4][col+j][z+k]);
-	
 						}
 					}
 				}
@@ -1019,35 +1023,30 @@ public class GridRouter extends ActiveRouter{
 					for (int k = -1; k < 2; k += 1){
 						if (boundaryCheck(row-4,col+j,z+k))
 							GC.add(cells[row-4][col+j][z+k]);
-	
 					}
 				}
 				for (int j = -1; j < 2; j += 1){
 					for (int k = -1; k < 2; k += 1){
 						if (boundaryCheck(row+j,col+4,z+k))
 							GC.add(cells[row+j][col+4][z+k]);
-	
 					}
 				}
 				for (int j = -1; j < 2; j += 1){
 					for (int k = -1; k < 2; k += 1){
 						if (boundaryCheck(row+j,col-4,z+k))
 							GC.add(cells[row+j][col-4][z+k]);
-	
 					}
 				}
 				for (int j = -1; j < 2; j += 1){
 					for (int k = -1; k < 2; k += 1){
 						if (boundaryCheck(row+j,col+k,z+4))
 							GC.add(cells[row+j][col+k][z+4]);
-	
 					}
 				}
 				for (int j = -1; j < 2; j += 1){
 					for (int k = -1; k < 2; k += 1){
 						if (boundaryCheck(row+j,col+k,z-4))
 							GC.add(cells[row+j][col+k][z-4]);
-	
 					}
 				}	
 			}
@@ -1056,8 +1055,7 @@ public class GridRouter extends ActiveRouter{
 				for (int i = -1; i < 2; i += 1){
 					for (int j = -1; j < 2; j += 1){
 						for (int k = -1; k < 2; k += 1){
-							GC.add(cells[row+i][col+j][z+k]);
-							
+							GC.add(cells[row+i][col+j][z+k]);	
 						}
 					}
 				}
@@ -1192,6 +1190,9 @@ public class GridRouter extends ActiveRouter{
 			double simClock = SimClock.getTime();
 			
 			for (double time = simClock; time <= simClock + msgTtl*60; time += updateInterval){
+				//double ts = System.currentTimeMillis();
+				//System.out.println(this.host+"   "+ SimClock.getTime()+" start time "+ts);
+				
 				HashMap<GridCell, List<DTNHost>> cellToHost= new HashMap<GridCell, List<DTNHost>>();
 				for (DTNHost host : hosts){
 					List<GridCell> gridCellList = this.gridLocation.get(host);
@@ -1229,6 +1230,9 @@ public class GridRouter extends ActiveRouter{
 				//ginterfaces.clear();//每次清空
 				ginterfaces = new HashMap<NetworkInterface, GridCell>();//每次清空
 				//CreateGrid(cellSize);//包含cells的new和ginterfaces的new
+				
+				//double te = System.currentTimeMillis();
+				//System.out.println(this.host+"   "+ SimClock.getTime()+" execution time "+(te-ts));
 			}
 		}
 		

@@ -22,6 +22,8 @@ import movement.Path;
 import movement.SatelliteMovement;
 import routing.GridRouter;
 import routing.MessageRouter;
+import routing.SPNR;
+import routing.SPNRmodify;
 import routing.ShortestDistanceSpaceRouter;
 import routing.ShortestDistanceSpaceRouter.GridNeighbors.GridCell;
 import routing.util.RoutingInfo;
@@ -622,14 +624,9 @@ public class DTNHost implements Comparable<DTNHost> {
 	 * @return
 	 */
 	public Coord getCoordinate(double time){
-		double[][] coordinate = new double[1][3];
-		//double[] t = new double[]{8000,0.1,15,0.0,0.0,0.0};;
-
-		SatelliteOrbit saot = new SatelliteOrbit(((SatelliteMovement)this.movement).getParameters());
-		//saot.SatelliteOrbit(t);
-		coordinate = saot.getSatelliteCoordinate(time);
 		Coord c = new Coord(0,0);
-		c.resetLocation((coordinate[0][0])+40000, (coordinate[0][1])+40000, (coordinate[0][2])+40000);
+		c.setLocation3D(((SatelliteMovement)this.movement).getSatelliteCoordinate(time));
+		
 		return c;
 	}
 	public double getPeriod(){
@@ -691,8 +688,7 @@ public class DTNHost implements Comparable<DTNHost> {
 	 * @return 返回全局节点列表
 	 */
 	public List<DTNHost> getHostsList(){
-		List<DTNHost> totalhosts = new ArrayList<DTNHost>();
-		totalhosts = this.hosts;
+		List<DTNHost> totalhosts = new ArrayList<DTNHost>(this.hosts);
 		return totalhosts;
 	}
 	/**
@@ -707,6 +703,8 @@ public class DTNHost implements Comparable<DTNHost> {
 		HashMap<String, Integer> gridRouterList = new HashMap<String, Integer>();//多种用到网格法的路由，需要在初始化的时候进行区分
 		gridRouterList.put("GridRouter", 1);
 		gridRouterList.put("ShortestDistanceSpaceRouter", 2);
+		gridRouterList.put("SPNR", 3);
+		gridRouterList.put("SPNRmodify", 4);
 		
 		HashMap<String, Integer> orbitCalculationWay = new HashMap<String, Integer>();
 		orbitCalculationWay.put("preOrbitCalculation", 1);
@@ -722,6 +720,12 @@ public class DTNHost implements Comparable<DTNHost> {
 				//break;
 			case 1:
 				((GridRouter)this.router).initialzation();
+				break;
+			case 3:
+				((SPNR)this.router).initialzation();
+				break;
+			case 4:
+				((SPNRmodify)this.router).initialzation();
 				break;
 			default: 
 				System.out.println("initialzation error in DTNHost.java line 722");

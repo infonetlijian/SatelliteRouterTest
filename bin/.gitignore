@@ -47,5 +47,6 @@ Temporary Items
 .apdisk
 /routing/
 /reports/
+/txtDataAnalysis.class
 /core/
-/movement/
+/txtDataAnalysis$changeTextFile.class

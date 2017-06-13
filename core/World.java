@@ -10,6 +10,7 @@ import input.ScheduledUpdatesQueue;
 import interfaces.ConnectivityOptimizer;
 import interfaces.SimpleSatelliteInterface;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -17,6 +18,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
+import routing.CGR;
+import routing.CGRbasedonEASR;
 import util.Tuple;
 
 /**
@@ -97,6 +100,32 @@ public class World {
 		
 		setNextEventQueue();
 		initSettings();
+		
+		/**新增CGR初始化步骤**/
+		HashMap<String, Integer> router = new HashMap<String, Integer>();
+		router.put("CGR", 1);
+		router.put("CGRbasedonEASR", 2);
+		Settings s = new Settings("Group");
+		if (router.get(s.getSetting("router")) != null){
+			System.out.println(s.getSetting("router"));
+			constractContactGraph();
+			if (router.get(s.getSetting("router")) == 1){
+				/**设置contactgraph**/
+				for(DTNHost h : this.hosts){
+					((CGR)h.getRouter()).setContactGraph(contactGraph);
+				}
+				System.out.println("node size: "+contactGraph.size());	
+				System.out.println("time size:  "+contactGraph.get(this.hosts.get(0)).size());
+			}
+			else{
+				/**设置contactgraph**/
+				for(DTNHost h : this.hosts){
+					((CGRbasedonEASR)h.getRouter()).setContactGraph(contactGraph);
+				}
+				System.out.println("node size: "+contactGraph.size());	
+				System.out.println("time size:  "+contactGraph.get(this.hosts.get(0)).size());
+			}
+		}			
 	}
 
 	/**
@@ -196,6 +225,7 @@ public class World {
 		}
 	}
 
+
 	public double calculateDistance(Coord c1,Coord c2){
 		double distance = c1.distance(c2);
 		return distance;
@@ -268,6 +298,126 @@ public class World {
 			return null;
 	}	
 	/*新增函数!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+	/*新增函数!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+	private HashMap<DTNHost, List<Tuple<DTNHost, DTNHost>>> contactGraph = new HashMap<DTNHost, List<Tuple<DTNHost, DTNHost>>>();
+	private Random random = new Random();
+	
+	/**
+	 * 用随机的方式，预先构建CGR在整个仿真过程中的链路建立情况
+	 */
+	public void constractContactGraph(){
+		Settings s = new Settings("Scenario");
+		double endTime = s.getDouble("endTime");
+		Settings CGRsettings = new Settings("Group");
+		
+		int duration = CGRsettings.getInt("router.CGR.LinkDurationTimesOfUpdateInterval");
+
+		for (double time = 0; time <= endTime + 1; time += duration * this.updateInterval){
+			for (DTNHost from : this.hosts){
+				/**判断这个节点在time时刻的contact plan，即链路是否已经在之前已经决定过了，决定过了就跳过**/
+//				if (contactGraph.get(from) != null)
+//					if (contactGraph.get(from).get(time) != null)
+//						continue;
+				
+				List<DTNHost> neighborHosts = getNeighbors(from, time);
+				DTNHost to = neighborHosts.get(random.nextInt(neighborHosts.size()));
+
+				Tuple<DTNHost, DTNHost> connection = new Tuple<DTNHost, DTNHost>(from, to);
+				addContactGraph(connection, time, duration);			
+			}
+		}
+		//System.out.println(this.contactGraph);
+	}
+	public List<DTNHost> getNeighbors(DTNHost host, double time){
+		List<DTNHost> neiHost = new ArrayList<DTNHost>();//邻居列表
+		HashMap<DTNHost, Coord> loc = new HashMap<DTNHost, Coord>();
+		loc.clear();
+		
+		/**实时计算全网节点的坐标构成拓扑图**/
+		for (DTNHost h : hosts){//更新指定时刻全局节点的坐标
+			//location.my_Test(time, 0, h.getParameters());
+			//Coord xyz = new Coord(location.getX(), location.getY(), location.getZ());
+			/**直接获取当前的节点位置，简化计算过程，提高仿真运行速度**/
+			Coord xyz = h.getCoordinate(time);
+			//Coord xyz = h.getLocation();
+			/**直接获取当前的节点位置，简化计算过程**/
+			loc.put(h, xyz);//记录指定时刻全局节点的坐标
+		}
+		
+		Coord myLocation = loc.get(host);
+		for (DTNHost h : hosts){//再分别及计算
+			if (h == host)
+				continue;
+			if (JudgeNeighbors(myLocation, loc.get(h)) == true){
+				//System.out.println(host+"  locate  "+myLocation+"  "+loc.get(host));
+				neiHost.add(h);
+			}
+		}
+		//System.out.println(host+" neighbor: "+neiHost+" time: "+time);
+		return neiHost;
+	}
+	/**
+	 * 对Coord类坐标进行距离计算
+	 * @param c1
+	 * @param c2
+	 * @return
+	 */
+	public boolean JudgeNeighbors(Coord c1,Coord c2){
+		Settings s = new Settings("Interface");
+		double transmitRange = s.getDouble("transmitRange");//从配置文件中读取传输半径
+		
+		double distance = c1.distance(c2);
+		if (distance <= transmitRange)
+			return true;
+		else
+			return false;
+	}	
+	public void addContactGraph(Tuple<DTNHost, DTNHost> connection, double time, int duration){
+		//this.updateInterval;
+		DTNHost from = connection.getKey();
+		DTNHost to = connection.getValue();
+		
+//		/**对double类型的值进行四舍五入，避免出现1.00000001这种情况**/
+//		BigDecimal b = new BigDecimal(time);  
+//		time = b.setScale(1, BigDecimal.ROUND_HALF_UP).doubleValue(); 
+		/**初始化用**/
+		if (this.contactGraph.get(from) == null){
+			List<Tuple<DTNHost, DTNHost>> contactPlan = new ArrayList<Tuple<DTNHost, DTNHost>>();
+			for (int i = 0 ; i < duration ; i++ ){
+				contactPlan.add(connection);
+			}		
+			this.contactGraph.put(from, contactPlan);		
+		}
+		else{			
+			List<Tuple<DTNHost, DTNHost>> contactPlan1 = this.contactGraph.get(from);
+			if (contactPlan1.size() >= (int)(time*10))
+				return;
+			for (int i = 0 ; i < duration ; i++ ){
+				contactPlan1.add(connection);
+			}				
+			this.contactGraph.put(from, contactPlan1);
+		}
+		if (this.contactGraph.get(to) == null){
+			List<Tuple<DTNHost, DTNHost>> contactPlan = new ArrayList<Tuple<DTNHost, DTNHost>>();
+			for (int i = 0 ; i < duration ; i++ ){
+				contactPlan.add(connection);
+			}	
+			this.contactGraph.put(to, contactPlan);
+		}
+		else{
+			List<Tuple<DTNHost, DTNHost>> contactPlan2 = this.contactGraph.get(to);
+			if (contactPlan2.size() >= (int)(time*10))
+				return;
+			for (int i = 0 ; i < duration ; i++ ){
+				contactPlan2.add(connection);
+			}					
+			this.contactGraph.put(to, contactPlan2);
+		}	
+		System.out.println("connection: "+connection +"  "+ time);
+	}
+	
+	/*新增函数!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 	/**
 	 * Updates all hosts (calls update for every one of them). If update
@@ -285,7 +435,7 @@ public class World {
 		case 1:	//全局最优路由算法,dijsktra
 			break;
 		case 2 ://simpleConnectivity;
-			updateAllHostsInterface();//新增,通过三层循环，建立全局所需的节点间连接!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			//updateAllHostsInterface();//新增,通过三层循环，建立全局所需的节点间连接!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 			break;
 		}
 		

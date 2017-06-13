@@ -348,10 +348,10 @@ abstract public class NetworkInterface implements ModuleCommunicationListener {
 		notifyConnectionListeners(CON_DOWN, anotherInterface.getHost());
 
 		// tear down bidirectional connection
-		if (!anotherInterface.getConnections().remove(con)) {
-			throw new SimError("No connection " + con + " found in " +
-					anotherInterface);	
-		}
+//		if (!anotherInterface.getConnections().remove(con)) {
+//			throw new SimError("No connection " + con + " found in " +
+//					anotherInterface);	
+//		}
 
 		this.host.connectionDown(con);
 		anotherInterface.getHost().connectionDown(con);
