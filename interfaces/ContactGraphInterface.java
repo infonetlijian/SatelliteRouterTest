@@ -115,12 +115,13 @@ public class ContactGraphInterface  extends NetworkInterface {
 		
 		/**用于读取之前约定好的contactGraph来进行建链过程**/
 //		double thisTime = SimClock.getTime();
-//		/**对double类型的值进行四舍五入，避免出现1.00000001这种情况**/
-//		BigDecimal b = new BigDecimal(thisTime);  
+//		/**对double类型的值进行精确操作**/
+		BigDecimal timeNow = new BigDecimal(SimClock.getTime());  
+		timeNow = timeNow.multiply(new BigDecimal(10));
 //		thisTime = b.setScale(1, BigDecimal.ROUND_HALF_UP).doubleValue(); 
 //		System.out.println(thisTime);
-		int index = (int)(SimClock.getTime() * 10);
-		Tuple<DTNHost, DTNHost> connection = ((CGR)this.getHost().getRouter()).getContactGraph().get(this.getHost()).get(index);
+		//int index = (int)(SimClock.getTime() * 10);
+		Tuple<DTNHost, DTNHost> connection = ((CGR)this.getHost().getRouter()).getContactGraph().get(this.getHost()).get(timeNow.intValue());
 		//System.out.println("connection: "+connection + "time:  "+SimClock.getIntTime());
 		/**这一时间根据接触图约定好的连接节点**/
 		DTNHost to;
@@ -130,12 +131,14 @@ public class ContactGraphInterface  extends NetworkInterface {
 			to = connection.getKey();
 
 		if (!connections.isEmpty()){
+			//if (connections.size() == 1)
 			if (connections.get(0).getOtherNode(this.getHost()).equals(to))
 				return;
 		}
 		else
 			connect(to.getInterface(1));
 
+		List<Connection> needToRemove = new ArrayList<Connection>();//记录需要移除的链路
 		
 		for (int i=0; i<this.connections.size(); i++) {
 			Connection con = this.connections.get(i);
@@ -146,13 +149,20 @@ public class ContactGraphInterface  extends NetworkInterface {
 			/**对于不是这一时刻约定好的链路，全部断开，同时保证同一时刻有一条可用链路**/
 			if (anotherInterface != to.getInterface(1) && connections.size() > 1){//更新节点位置后，检查之前维护的连接是否会因为太远而断掉
 				disconnect(con,anotherInterface);
-				connections.remove(i);
+				needToRemove.add(connections.get(i));
+		
 			}
 			if (!isWithinRange(anotherInterface)) {//更新节点位置后，检查之前维护的连接是否会因为太远而断掉
 				disconnect(con,anotherInterface);
-				connections.remove(i);
+				if (!needToRemove.contains(connections.get(i)))
+					needToRemove.add(connections.get(i));
 			}
 		}
+		
+		for (Connection c : needToRemove){
+			connections.remove(c);//在此从列表中移除
+		}
+		
 //		Settings s = new Settings(USERSETTINGNAME_S);
 //		int mode = s.getInt(ROUTERMODENAME_S);//从配置文件中读取路由模式
 //		switch(mode){

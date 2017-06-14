@@ -313,7 +313,7 @@ public class World {
 		
 		int duration = CGRsettings.getInt("router.CGR.LinkDurationTimesOfUpdateInterval");
 
-		for (double time = 0; time <= endTime + 1; time += duration * this.updateInterval){
+		for (double time = 0; time <= endTime + 100; time += duration * this.updateInterval){
 			for (DTNHost from : this.hosts){
 				/**判断这个节点在time时刻的contact plan，即链路是否已经在之前已经决定过了，决定过了就跳过**/
 //				if (contactGraph.get(from) != null)
