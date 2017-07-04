@@ -21,7 +21,7 @@ Scenario.simulateConnections = true
 Scenario.updateInterval = 0.1
 # 43200s == 12h
 Scenario.endTime = 6018.2
-#Scenario.endTime = 100
+#Scenario.endTime = 200
 
 ## Interface-specific settings:
 # type : which interface class the interface belongs to
@@ -31,13 +31,15 @@ Scenario.endTime = 6018.2
 # transmitRange : range of the interface (meters)
 
 # "Bluetooth" interface for all nodes
-#Interface.type = SimpleSatelliteInterface
-Interface.type = ContactGraphInterface
+Interface.type = EnableInterruptionsInterface
+#Interface.type = ContactGraphInterface
+#Interface.type = RandomlyInterruptInterface
+Interface.probabilityOfInterrupt = 0.0
 # Transmit speed of 2 Mbps = 250kBps
 Interface.transmitSpeed = 100k
 #注意：ONE中距离单位是meters
 #由于JAT中距离单位为km，因此我们将ONE中的距离单位统一视为km，这样只会在自带的图形界面单位上产生误解，但内部程序的逻辑上没有问题
-Interface.transmitRange = 3000
+Interface.transmitRange = 5000
 
 
 
@@ -80,9 +82,9 @@ Group.sendQueue = 1
 #Group.router = GridRouter
 #Group.router = DijsktraSearchBasedonTemporalGraph
 #Group.router = SPNR
-#Group.router = SPNRmodify
-Group.router = CGR
-Group.router.CGR.LinkDurationTimesOfUpdateInterval = 100
+Group.router = SPNRmodify
+#Group.router = CGR
+Group.router.CGR.LinkDurationTimesOfUpdateInterval = 10
 Group.layer = 3
 Group.Pre_or_onlineOrbitCalculation = preOrbitCalculation
 #Group.Pre_or_onlineOrbitCalculation = onlineOrbitCalculation
@@ -102,7 +104,7 @@ Group.speed = 0.5, 1.5
 Group.msgTtl = 30
 
 #Group.nrofHosts = [10;20;30;40;50]
-Group.nrofHosts = 150
+Group.nrofHosts = 66
 
 # group1 (pedestrians) specific settings
 Group1.groupID = Node
@@ -123,10 +125,10 @@ Events1.interval = 1,60
 # Message sizes (500kB - 2MB)
 
 #Events1.size = 100k,1M
-Events1.size = 20k,20k
+Events1.size = 30k,30k
 # range of message source/destination addresses
 #Events1.hosts = [0,9;0,19;0,29;0,39;0,49]修改，注意hosts和tohosts包括下界但不包括上界，即[0, 9)
-Events1.hosts = [0,150]
+Events1.hosts = [0,66]
 
 # Message ID prefix
 Events1.prefix = M

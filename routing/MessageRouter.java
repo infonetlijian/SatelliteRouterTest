@@ -376,7 +376,7 @@ public abstract class MessageRouter {
 			addToMessages(aMessage, false);
 		} else if (isFirstDelivery) {//isFirstDelivery为真的条件是，没有要回传的outgoing包，且deliveredMessages列表里还没有添加传入的incoming包
 			this.deliveredMessages.put(id, aMessage);
-			System.out.println(aMessage.getId()+"  "+aMessage.getFrom()+"  "+aMessage.getTo()+"  "+aMessage.getHops()+"  "+this.messages+"  "+this.deliveredMessages);
+			System.out.println("delivered  "+aMessage.getId()+"  "+aMessage.getFrom()+"  "+aMessage.getTo()+"  "+aMessage.getHops()+"  "+this.messages+"  "+this.deliveredMessages);
 		} else if (outgoing == null) {//到这一步为真，代表接收到的incoming包不是第一次发来的，且此包对应的app处理没有outgoing要发，所以应该加入黑名单，准备丢弃
 			// Blacklist messages that an app wants to drop.
 			// Otherwise the peer will just try to send it back again.

@@ -8,6 +8,7 @@ import gui.DTNSimGUI;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import ui.DTNSimTextUI;
 
@@ -39,7 +40,7 @@ public class DTNSim {
 	 * settings files (if given) is the run index to use for that run.
 	 * @param args Command line arguments
 	 */
-	public static void main(String[] args) {		
+	public static void main(String[] args) {	
 		boolean batchMode = false;
 		int nrofRuns[] = {0,1};
 		String confFiles[];

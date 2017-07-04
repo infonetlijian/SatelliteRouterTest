@@ -95,6 +95,21 @@ public class CGRbasedonEASR extends ActiveRouter{
 		return new CGRbasedonEASR(this);
 	}
 	/**
+	 * 在Networkinterface类中执行链路中断函数disconnect()后，对应节点的router调用此函数
+	 */
+	@Override
+	public void changedConnection(Connection con){
+		super.changedConnection(con);
+
+//		if (!con.isUp()){
+//			if(con.isTransferring()){
+//				if (con.getOtherNode(this.getHost()).getRouter().isIncomingMessage(con.getMessage().getId()))
+//					con.getOtherNode(this.getHost()).getRouter().removeFromIncomingBuffer(con.getMessage().getId(), this.getHost());
+//				super.addToMessages(con.getMessage(), false);//对于因为链路中断而丢失的消息，重新放回发送方的队列中，并且删除对方节点的incoming信息
+//			}
+//		}
+	}
+	/**
 	 * 路由更新，每次调用路由更新时的主入口
 	 */
 	@Override
@@ -394,7 +409,7 @@ public class CGRbasedonEASR extends ActiveRouter{
 					if (nextTime > this.simEndTime)
 						nextTime = (int)this.simEndTime;
 					
-					Tuple<DTNHost, DTNHost> connection = this.getContactGraph().get(host).get((double)nextTime);
+					Tuple<DTNHost, DTNHost> connection = this.getContactGraph().get(host).get(nextTime);
 					DTNHost oneNeighborHost = connection.getValue() == host ? connection.getKey() : connection.getValue();
 					List<Double> linkSetUpTime = new ArrayList<Double>();
 					linkSetUpTime.add((double)nextTime);

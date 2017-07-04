@@ -81,6 +81,10 @@ public class SPNR extends ActiveRouter{
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> neighborsList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();//新增全局其它节点邻居链路生存时间信息
 	protected HashMap<DTNHost, HashMap<DTNHost, double[]>> predictList = new HashMap<DTNHost, HashMap<DTNHost, double[]>>();
 	
+	/**检测最后一跳用**/
+	private boolean finalHopLabel = false;
+	private Connection finalHopConnection = null;
+
 	private boolean routerTableUpdateLabel;
 	private GridNeighbors GN;
 	Random random = new Random();
@@ -108,6 +112,7 @@ public class SPNR extends ActiveRouter{
 		//this.GN = new GridNeighbors(this.getHost());
 		return new SPNR(this);
 	}
+
 	/**
 	 * 执行路由的初始化操作
 	 */
@@ -115,6 +120,21 @@ public class SPNR extends ActiveRouter{
 		GN.setHost(this.getHost());//为了实现GN和Router以及Host之间的绑定，待修改！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
 		//this.GN.initializeGridLocation();
 	}	
+	/**
+	 * 在Networkinterface类中执行链路中断函数disconnect()后，对应节点的router调用此函数
+	 */
+	@Override
+	public void changedConnection(Connection con){
+		super.changedConnection(con);
+
+//		if (!con.isUp()){
+//			if(con.isTransferring()){
+//				if (con.getOtherNode(this.getHost()).getRouter().isIncomingMessage(con.getMessage().getId()))
+//					con.getOtherNode(this.getHost()).getRouter().removeFromIncomingBuffer(con.getMessage().getId(), this.getHost());
+//				super.addToMessages(con.getMessage(), false);//对于因为链路中断而丢失的消息，重新放回发送方的队列中，并且删除对方节点的incoming信息
+//			}
+//		}
+	}
 	/**
 	 * 路由更新，每次调用路由更新时的主入口
 	 */
@@ -215,6 +235,91 @@ public class SPNR extends ActiveRouter{
 			return sendMsg(t);
 		}
 	}
+
+
+	/**
+	 * 通过更新路由表，找到当前信息应当转发的下一跳节点，并且根据预先设置决定此计算得到的路径信息是否需要写入信息msg头部当中
+	 * @param message
+	 * @param connections
+	 * @param msgPathLabel
+	 * @return
+	 */
+	public Tuple<Message, Connection> findPathFromRouterTabel(Message message, List<Connection> connections, boolean msgPathLabel){
+		
+		if (updateRouterTable(message) == false){//在传输之前，先更新路由表
+			System.out.println("null");
+			return null;//若没有返回说明一定找到了对应路径
+		}
+//		/**获取网格路径**/
+//		GridCell desNetgrid = GN.getGridCellFromCoordNow(message.getTo());
+//		List<Tuple<GridCell, Boolean>> netgridRouterPath = netgridRouterTable.get(desNetgrid);
+//		System.out.println(message);
+//		if (netgridRouterPath == null){
+//			System.out.println(message);
+//			System.out.println("寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(desNetgrid).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(desNetgrid));
+//			
+//			//System.out.println("寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(GN.getGridCellFromCoordNow(message.getTo())).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(GN.getGridCellFromCoordNow(message.getTo())));
+//			throw new SimError("Path error!");
+//			//return null;
+//		}		
+//		/**对网格路径进行“翻译”，每一跳转换成节点集合**/
+//		List<Tuple<List<Integer>, Boolean>> routerPath = this.getRouterPathFromNetgridPath(message, netgridRouterPath);
+		
+		List<Tuple<List<Integer>, Boolean>> routerPath = this.multiPathFromNetgridTable.get(message.getTo());
+		if (routerPath == null){
+			System.out.println(message);
+			GridCell desNetgrid = GN.getGridCellFromCoordNow(message.getTo());
+			System.out.println("失败！！！    "+" Path length:  "+netgridRouterTable.get(desNetgrid).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(desNetgrid));
+			
+			//System.out.println("寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(GN.getGridCellFromCoordNow(message.getTo())).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(GN.getGridCellFromCoordNow(message.getTo())));
+			throw new SimError("Path error!");
+			//return null;
+		}		
+		
+		System.out.println("routerPath: "+routerPath);
+		//List<Tuple<Integer, Boolean>> routerPath = this.routerTable.get(message.getTo());
+		
+		if (msgPathLabel == true){//如果写入路径信息标志位真，就写入路径消息
+			message.updateProperty(MSG_ROUTERPATH, routerPath);
+		}
+		
+		if (finalHopLabel == true){
+			Tuple<Message, Connection> t = new Tuple<Message, Connection>(message, finalHopConnection);//找到与第一跳节点的连接
+			System.out.println("test");
+			return t;
+		}
+
+		Connection path = findConnectionFromHosts(message, routerPath.get(0).getKey());//取第一跳的节点地址
+		if (path != null){
+			Tuple<Message, Connection> t = new Tuple<Message, Connection>(message, path);//找到与第一跳节点的连接
+			return t;
+		}
+		/**添加重复寻路代码，如果用网格法找不到路径，就再运行一次基于节点的路径寻找算法**/
+		this.shortestPathSearchbasedonDTNHost(message);
+		if (this.routerTable.containsKey(message.getTo())){
+			List<Tuple<Integer, Boolean>> DTNHostPath = this.routerTable.get(message.getTo());
+			Connection connection = findConnection(DTNHostPath.get(0).getKey());//取第一跳的节点地址
+			System.out.println("DTNHost search!");
+			if (DTNHostPath != null){
+				Tuple<Message, Connection> t = new Tuple<Message, Connection>(message, connection);//找到与第一跳节点的连接
+				return t;
+			}		
+		}			
+		else{
+			System.out.println("Connection null!  "+message+"  "+message.getProperty(MSG_WAITLABEL));
+			System.out.println(this.getHost()+"  "+this.getHost().getAddress()+"  "+this.getHost().getConnections());
+			System.out.println(routerPath);
+			System.out.println(this.routerTable);
+			//System.out.println(this.getHost().getNeighbors().getNeighbors());
+			//System.out.println(this.getHost().getNeighbors().getNeighborsLiveTime());
+//			throw new SimError("No such connection: "+ routerPath.get(0) + 
+//					" at routerTable " + this);	
+			message.removeProperty(MSG_ROUTERPATH);
+			return null;
+		//this.routerTable.remove(message.getTo());	
+		}
+		return null;
+	}
 	/**
 	 * 通过读取信息msg头部里的路径信息，来获取路由路径，如果失效，则需要当前节点重新计算路由
 	 * @param msg
@@ -269,80 +374,6 @@ public class SPNR extends ActiveRouter{
 			}
 		}
 		return null;	
-	}
-
-	/**
-	 * 通过更新路由表，找到当前信息应当转发的下一跳节点，并且根据预先设置决定此计算得到的路径信息是否需要写入信息msg头部当中
-	 * @param message
-	 * @param connections
-	 * @param msgPathLabel
-	 * @return
-	 */
-	public Tuple<Message, Connection> findPathFromRouterTabel(Message message, List<Connection> connections, boolean msgPathLabel){
-		
-		if (updateRouterTable(message) == false){//在传输之前，先更新路由表
-			return null;//若没有返回说明一定找到了对应路径
-		}
-//		/**获取网格路径**/
-//		GridCell desNetgrid = GN.getGridCellFromCoordNow(message.getTo());
-//		List<Tuple<GridCell, Boolean>> netgridRouterPath = netgridRouterTable.get(desNetgrid);
-//		System.out.println(message);
-//		if (netgridRouterPath == null){
-//			System.out.println(message);
-//			System.out.println("寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(desNetgrid).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(desNetgrid));
-//			
-//			//System.out.println("寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(GN.getGridCellFromCoordNow(message.getTo())).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(GN.getGridCellFromCoordNow(message.getTo())));
-//			throw new SimError("Path error!");
-//			//return null;
-//		}		
-//		/**对网格路径进行“翻译”，每一跳转换成节点集合**/
-//		List<Tuple<List<Integer>, Boolean>> routerPath = this.getRouterPathFromNetgridPath(message, netgridRouterPath);
-		
-		List<Tuple<List<Integer>, Boolean>> routerPath = this.multiPathFromNetgridTable.get(message.getTo());
-		if (routerPath == null){
-			System.out.println(message);
-			GridCell desNetgrid = GN.getGridCellFromCoordNow(message.getTo());
-			System.out.println("寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(desNetgrid).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(desNetgrid));
-			
-			//System.out.println("寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(GN.getGridCellFromCoordNow(message.getTo())).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(GN.getGridCellFromCoordNow(message.getTo())));
-			throw new SimError("Path error!");
-			//return null;
-		}		
-		
-		//List<Tuple<Integer, Boolean>> routerPath = this.routerTable.get(message.getTo());
-		if (routerPath == null)
-			return null;
-		
-		if (msgPathLabel == true){//如果写入路径信息标志位真，就写入路径消息
-			message.updateProperty(MSG_ROUTERPATH, routerPath);
-		}
-					
-		Connection path = findConnectionFromHosts(message, routerPath.get(0).getKey());//取第一跳的节点地址
-		if (path != null){
-			Tuple<Message, Connection> t = new Tuple<Message, Connection>(message, path);//找到与第一跳节点的连接
-			return t;
-		}
-		else{			
-			if (routerPath.get(0).getValue()){
-				System.out.println("第一跳预测");
-				return null;
-				//DTNHost nextHop = this.getHostFromAddress(routerPath.get(0).getKey()); 
-				//this.busyLabel.put(message.getId(), startTime);//设置一个等待
-			}
-			else{
-				System.out.println(message+"  "+message.getProperty(MSG_WAITLABEL));
-				System.out.println(this.getHost()+"  "+this.getHost().getAddress()+"  "+this.getHost().getConnections());
-				System.out.println(routerPath);
-				System.out.println(this.routerTable);
-				System.out.println(this.getHost().getNeighbors().getNeighbors());
-				System.out.println(this.getHost().getNeighbors().getNeighborsLiveTime());
-//				throw new SimError("No such connection: "+ routerPath.get(0) + 
-//						" at routerTable " + this);	
-				message.removeProperty(MSG_ROUTERPATH);
-				return null;
-			//this.routerTable.remove(message.getTo());	
-			}
-		}
 	}
 	/**
 	 * 将网格路径转换为节点集合的路径
@@ -427,15 +458,35 @@ public class SPNR extends ActiveRouter{
 			//m.changeRouterPath(this.routerTable.get(m.getTo()));//把计算出来的路径直接写入信息当中
 			List<Tuple<List<Integer>, Boolean>> path = getRouterPathFromNetgridPath(msg, netgridRouterTable.get(desNetgrid));
 			this.multiPathFromNetgridTable.put(msg.getTo(), path);
-			System.out.println("寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(desNetgrid).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(desNetgrid));
+			System.out.println(SimClock.getTime()+" 寻路成功！！！    "+" Path length:  "+netgridRouterTable.get(desNetgrid).size()+" routertable size: "+netgridRouterTable.size()+" Netgrid Path:  "+netgridRouterTable.get(desNetgrid));
 			return true;//找到了路径
 		}else{
-			//System.out.println("寻路失败！！！");
+			System.out.println("寻路失败！！！");
 			return false;
 		}
 			
 	}
-	
+	/**
+	 * 冒泡排序
+	 * @param distanceList
+	 * @return
+	 */
+	public List<Tuple<DTNHost, Double>> sortBasedOnDTNHost(List<Tuple<DTNHost, Double>> distanceList){
+		for (int j = 0; j < distanceList.size(); j++){
+			for (int i = 0; i < distanceList.size() - j - 1; i++){
+				if (distanceList.get(i).getValue() > distanceList.get(i + 1).getValue()){//从小到大，大的值放在队列右侧
+					Tuple<DTNHost, Double> var1 = distanceList.get(i);
+					Tuple<DTNHost, Double> var2 = distanceList.get(i + 1);
+					distanceList.remove(i);
+					distanceList.remove(i);//注意，一旦执行remove之后，整个List的大小就变了，所以原本i+1的位置现在变成了i
+					//注意顺序
+					distanceList.add(i, var2);
+					distanceList.add(i + 1, var1);
+				}
+			}
+		}
+		return distanceList;
+	}
 	/**
 	 * 冒泡排序
 	 * @param distanceList
@@ -457,6 +508,26 @@ public class SPNR extends ActiveRouter{
 		}
 		return distanceList;
 	}
+	
+	private HashMap<GridCell, List<DTNHost>> GridCellToDTNHosts = new HashMap<GridCell, List<DTNHost>>();
+	private HashMap<DTNHost, GridCell> DTNHostToGridCell = new HashMap<DTNHost, GridCell>();
+	public void updateRelationshipofGridsAndDTNHosts(){
+		DTNHostToGridCell.clear();
+		GridCellToDTNHosts.clear();
+		
+		/**全局节点遍历一次**/
+		for (DTNHost h : this.getHost().getHostsList()){
+			GridCell Netgrid = GN.getGridCellFromCoordNow(h);
+			DTNHostToGridCell.put(h, Netgrid);
+			
+			if (GridCellToDTNHosts.containsKey(Netgrid)){
+				List<DTNHost> hosts = GridCellToDTNHosts.get(Netgrid);
+				hosts.add(h);
+				GridCellToDTNHosts.put(Netgrid, hosts);
+			}
+		}
+	}
+	
 
 	/**
 	 * 核心路由算法，运用贪心选择性质进行遍历，找出到达目的节点的最短路径
@@ -465,11 +536,16 @@ public class SPNR extends ActiveRouter{
 	public void gridSearch(Message msg){
 //		double t0 = System.currentTimeMillis();
 //		System.out.println("start: "+t0);//用于统计路由算法的运行时间
+		this.finalHopLabel = false;
+		this.finalHopConnection = null;
 		
 		if (routerTableUpdateLabel == true)//routerTableUpdateLabel == true则代表此次更新路由表已经更新过了，所以不要重复计算
 			return;
 		this.netgridRouterTable.clear();
 		this.netgridArrivalTime.clear();
+		
+		arrivalTime.clear();
+		routerTable.clear();
 		
 		if (GN.isHostsListEmpty()){
 			GN.setHostsList(hosts);
@@ -488,8 +564,8 @@ public class SPNR extends ActiveRouter{
 			break;
 		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
 			/**!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!更新的时间段待修改!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!**/
-			GN.updateNetGridInfo_without_OrbitCalculation(this.RoutingTimeNow);
-			//GN.updateNetGridInfo_without_OrbitCalculation_without_gridTable();
+			//GN.updateNetGridInfo_without_OrbitCalculation(this.RoutingTimeNow);
+			GN.updateNetGridInfo_without_OrbitCalculation_without_gridTable();
 			//GN.updateGrid_without_OrbitCalculation(this.RoutingTimeNow);//更新网格表
 			/**!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!**/
 			/**!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!**/
@@ -508,9 +584,11 @@ public class SPNR extends ActiveRouter{
 		sourceSet.add(thisHostGrid);//初始时只有源节点所属网格
 		searchedSet.add(thisHostGrid);
 		
-		for (Connection con : this.getHost().getConnections()){//添加链路可探测到的一跳邻居，并更新路由表
+		List<GridCell> oneHopNeighbors = new ArrayList<GridCell>();//记录一跳的邻居为后续验证网格法得到的邻居正确性用
+		for (Connection con : this.getConnections()){//添加链路可探测到的一跳邻居，并更新路由表
 			DTNHost neiHost = con.getOtherNode(this.getHost());
 			GridCell neighborNetgrid = GN.getGridCellFromCoordNow(neiHost);
+			oneHopNeighbors.add(neighborNetgrid);//记录一跳的邻居为后续验证网格法得到的邻居正确性用
 			sourceSet.add(neighborNetgrid);//初始时只有本网格和邻居网格		
 			Double time = this.RoutingTimeNow + msg.getSize()/transmitSpeed;
 			
@@ -520,6 +598,21 @@ public class SPNR extends ActiveRouter{
 			
 			netgridArrivalTime.put(neighborNetgrid, time);
 			netgridRouterTable.put(neighborNetgrid, path);
+
+			List<Tuple<Integer, Boolean>> DTNHostpath = new ArrayList<Tuple<Integer, Boolean>>();
+			Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), false);
+			DTNHostpath.add(hop);//注意顺序
+			arrivalTime.put(neiHost, time);
+			routerTable.put(neiHost, DTNHostpath);
+			
+			if (msg.getTo() == neiHost){//一跳的邻居节点，直接返回
+				finalHopLabel = true;
+				finalHopConnection = con;
+				System.out.println(msg+" through "+finalHopConnection+"  to "+msg.getTo());
+				GridCell desNetgrid = GN.getGridCellFromCoordNow(msg.getTo());
+				System.out.println(desNetgrid+"  "+neighborNetgrid+"  "+SimClock.getTime());
+				return;
+			}
 		}
 		/**添加链路可探测到的一跳邻居网格，并更新路由表**/
 		
@@ -527,9 +620,10 @@ public class SPNR extends ActiveRouter{
 		int size = this.hosts.size();
 		boolean updateLabel = true;
 		boolean predictLable = false;
-
 		
 		netgridArrivalTime.put(GN.getGridCellFromCoordNow(this.getHost()), this.RoutingTimeNow);//初始化到达时间
+		
+		arrivalTime.put(this.getHost(), this.RoutingTimeNow);//初始化到达时间
 		
 		/**优先级队列，做排序用**/
 		List<Tuple<GridCell, Double>> PriorityQueue = new ArrayList<Tuple<GridCell, Double>>();
@@ -552,6 +646,12 @@ public class SPNR extends ActiveRouter{
 				HashMap<GridCell, Tuple<GridCell, List<DTNHost>>> neighborNetgridsList = GN.getNeighborsNetgridsNow(c);//获取源集合中host节点的邻居节点(当前的邻居网格)
 				//System.out.println("RoutingHost and time :  "+this.getHost()+this.RoutingTimeNow+"  thisHostGrid:  "+thisHostGrid  +"  SourceNetgird:  "+c+"  contains:  "+GN.getHostsFromNetgridNow(c, this.RoutingTimeNow)+"  NeighborNetgrid:  "+neighborNetgridsList.keySet()+" contains: "+neighborNetgridsList.values()+"  sourceSet:  "+sourceSet);
 				
+				/**确保读表找到的第一跳邻居节点是有实际可通行链路的**/
+				//if (c == thisHostGrid)//如果c是本节点的邻居，检查读表得到的邻居正确性
+				//	if (!(oneHopNeighbors.isEmpty() && neighborNetgridsList.isEmpty()))
+				//		neighborNetgridsList.keySet().retainAll(oneHopNeighbors);
+				
+				
 				double t01 = System.currentTimeMillis();//复杂度测试代码
 				TNMCostTime += (t01-t00);				//复杂度测试代码
 				
@@ -572,12 +672,25 @@ public class SPNR extends ActiveRouter{
 										
 					double time = netgridArrivalTime.get(c) + msg.getSize()/transmitSpeed;
 					
+					DTNHost thisHost;
+					if (this.GridCellToDTNHosts.get(c).size() > 1)
+						thisHost = this.GridCellToDTNHosts.get(c).get(this.random.nextInt(this.GridCellToDTNHosts.get(c).size() - 1));
+					else
+						thisHost = this.GridCellToDTNHosts.get(c).get(0);
+					time = arrivalTime.get(thisHost) + msg.getSize()/transmitSpeed;
+					
 					/**添加路径信息**/
 					List<Tuple<GridCell, Boolean>> path = new ArrayList<Tuple<GridCell, Boolean>>();
 					if (this.netgridRouterTable.containsKey(c))
 						path.addAll(this.netgridRouterTable.get(c));
 					Tuple<GridCell, Boolean> thisHop = new Tuple<GridCell, Boolean>(eachNeighborNetgrid, predictLable);
 					path.add(thisHop);//注意顺序
+					/**添加路径信息**/
+					List<Tuple<Integer, Boolean>> DTNHostpath = new ArrayList<Tuple<Integer, Boolean>>();
+					Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(thisHost.getAddress(), false);
+					DTNHostpath.add(hop);//注意顺序
+					arrivalTime.put(thisHost, time);
+					routerTable.put(thisHost, DTNHostpath);
 					/**添加路径信息**/
 					
 					/**维护最小传输时间的队列**/
@@ -633,6 +746,180 @@ public class SPNR extends ActiveRouter{
 		//System.out.println(this.getHost()+" table: "+netgridRouterTable+" time : "+SimClock.getTime());
 	}
 	
+	public void shortestPathSearchbasedonDTNHost(Message msg){
+		this.routerTable.clear();
+		this.arrivalTime.clear();
+
+		
+		if (GN.isHostsListEmpty()){
+			GN.setHostsList(hosts);
+		}
+		//GridNeighbors GN = this.getHost().getGridNeighbors();
+		Settings s = new Settings(GROUPNAME_S);
+		String option = s.getSetting("Pre_or_onlineOrbitCalculation");//从配置文件中读取设置，是采用在运行过程中不断计算轨道坐标的方式，还是通过提前利用网格表存储各个节点的轨道信息
+		
+		HashMap<String, Integer> orbitCalculationWay = new HashMap<String, Integer>();
+		orbitCalculationWay.put("preOrbitCalculation", 1);
+		orbitCalculationWay.put("onlineOrbitCalculation", 2);
+		
+		switch (orbitCalculationWay.get(option)){
+		case 2:
+			//GN.updateGrid_with_OrbitCalculation();//更新网格表
+			break;
+		case 1://通过提前利用网格表存储各个节点的轨道信息，从而运行过程中不再调用轨道计算函数来预测而是通过读表来预测
+			/**!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!更新的时间段待修改!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!**/
+			//GN.updateNetGridInfo_without_OrbitCalculation(this.RoutingTimeNow);
+			GN.updateNetGridInfo_without_OrbitCalculation_without_gridTable();//加快仿真进度用，直接读取现有的节点坐标值，然后转换成对应网格坐标
+			//GN.updateGrid_without_OrbitCalculation(this.RoutingTimeNow);//更新网格表
+			/**!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!**/
+			/**!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!**/
+			/**!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!**/
+			break;
+		}
+		/**全网的传输速率假定为一样的**/
+		double transmitSpeed = this.getHost().getInterface(1).getTransmitSpeed();
+		/**表示路由开始的时间**/
+		//double RoutingTimeNow = SimClock.getTime();
+		
+		/**添加链路可探测到的一跳邻居网格，并更新路由表**/
+		List<DTNHost> searchedSet = new ArrayList<DTNHost>();
+		List<DTNHost> sourceSet = new ArrayList<DTNHost>();
+		sourceSet.add(this.getHost());//初始时只有源节点所
+		searchedSet.add(this.getHost());//初始时只有源节点
+		
+		for (Connection con : this.getHost().getConnections()){//添加链路可探测到的一跳邻居，并更新路由表
+			DTNHost neiHost = con.getOtherNode(this.getHost());
+			sourceSet.add(neiHost);//初始时只有本节点和链路邻居		
+			Double time = SimClock.getTime() + msg.getSize()/this.getHost().getInterface(1).getTransmitSpeed();
+			List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();
+			Tuple<Integer, Boolean> hop = new Tuple<Integer, Boolean>(neiHost.getAddress(), false);
+			path.add(hop);//注意顺序
+			arrivalTime.put(neiHost, time);
+			routerTable.put(neiHost, path);
+		}
+		
+		/**添加链路可探测到的一跳邻居网格，并更新路由表**/
+		
+		int iteratorTimes = 0;
+		int size = this.hosts.size();
+		boolean updateLabel = true;
+		boolean predictLable = false;
+
+		arrivalTime.put(this.getHost(), this.RoutingTimeNow);//初始化到达时间
+		//netgridArrivalTime.put(GN.getGridCellFromCoordNow(this.getHost()), this.RoutingTimeNow);//初始化到达时间
+		
+		/**优先级队列，做排序用**/
+		List<Tuple<DTNHost, Double>> PriorityQueue = new ArrayList<Tuple<DTNHost, Double>>();
+		//List<Tuple<GridCell, Double>> PriorityQueue = new ArrayList<Tuple<GridCell, Double>>();
+		//List<GridCell> GridCellListinPriorityQueue = new ArrayList<GridCell>();
+		//List<Double> correspondingTimeinQueue = new ArrayList<Double>();
+		/**优先级队列，做排序用**/
+		
+		double TNMCostTime = 0;//测试算法运行时间用
+		//int countTimes = 0;//测试用，可删
+		
+		while(true){//Dijsktra算法思想，每次历遍全局，找时延最小的加入路由表，保证路由表中永远是时延最小的路径
+			if (iteratorTimes >= size )//|| updateLabel == false)
+				break; 
+			updateLabel = false;
+			
+			for (DTNHost c : sourceSet){
+				
+				double t00 = System.currentTimeMillis();//复杂度测试代码
+							
+				//List<DTNHost> neiList = GN.getNeighborsNetgrids(c, netgridArrivalTime.get(c));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
+				List<DTNHost> neighborHostsList = GN.getNeighborsHostsNow(GN.getGridCellFromCoordNow(c));//获取源集合中host节点的邻居节点(当前的邻居网格)
+				//System.out.println("RoutingHost and time :  "+this.getHost()+this.RoutingTimeNow+"  thisHostGrid:  "+thisHostGrid  +"  SourceNetgird:  "+c+"  contains:  "+GN.getHostsFromNetgridNow(c, this.RoutingTimeNow)+"  NeighborNetgrid:  "+neighborNetgridsList.keySet()+" contains: "+neighborNetgridsList.values()+"  sourceSet:  "+sourceSet);
+				
+//				List<DTNHost> neighborHostsFromTGM = this.getHost().getNeighbors().getNeighbors(c, SimClock.getTime());
+//				if (neighborHostsFromTGM.containsAll(neighborHostsList)){
+//					if (neighborHostsFromTGM.size() == neighborHostsList.size()){
+//						System.out.println(c+ "'s neighbors equal "+(++countTimes));
+//					}
+//					else{
+//						System.out.println(c+ "  their neighbors number are "+neighborHostsFromTGM.size()+" and "+neighborHostsList.size());
+//						System.out.println(neighborHostsFromTGM+" and "+neighborHostsList);
+//					}
+//				}
+//				else{
+//					System.out.println("error TGM: "+neighborHostsFromTGM );
+//				}
+					
+				
+				
+//				if (neighborNetgridsList.containsKey(thisHostGrid)){
+//					neighborNetgridsList.remove(thisHostGrid);
+//				}
+				//System.out.println("searchedSet  "+searchedSet+"   sourceSet   "+sourceSet);
+				/**判断是否已经是搜索过的源网格集合中的网格**/
+				if (searchedSet.contains(c))
+					continue;				
+				searchedSet.add(c);
+				
+				for (DTNHost eachNeighborHost : neighborHostsList){//startTime.keySet()包含了所有的邻居节点，包含未来的邻居节点
+					if (sourceSet.contains(eachNeighborHost))//确保不回头
+						continue;
+					//System.out.println("Host and time :  "+this.getHost()+this.RoutingTimeNow+"  thisHostGrid:  "+thisHostGrid  +"  SourceNetgird:  "+c+"  contains:  "+GN.getHostsFromNetgridNow(c, this.RoutingTimeNow)+"  NeighborNetgrid:  "+eachNeighborNetgrid+ " contains: "+neighborNetgridsList.get(eachNeighborNetgrid)+"  sourceSet:  "+sourceSet);
+										
+					double time = arrivalTime.get(c) + msg.getSize()/transmitSpeed;
+					
+					/**添加路径信息**/
+					List<Tuple<Integer, Boolean>> path = new ArrayList<Tuple<Integer, Boolean>>();
+					if (this.routerTable.containsKey(c))
+						path.addAll(this.routerTable.get(c));
+					Tuple<Integer, Boolean> thisHop = new Tuple<Integer, Boolean>(eachNeighborHost.getAddress(), predictLable);
+					path.add(thisHop);//注意顺序
+					/**添加路径信息**/
+					
+					/**维护最小传输时间的队列**/
+					if (arrivalTime.containsKey(eachNeighborHost)){
+						/**检查队列中是否已有通过此网格的路径，如果有，看哪个时间更短**/
+						if (time <= arrivalTime.get(eachNeighborHost)){
+							if (random.nextBoolean() == true && time - arrivalTime.get(eachNeighborHost) < 0.1){//如果时间相等，做随机化选择
+								
+								/**注意，在对队列进行迭代的时候，不能够在for循环里面对此队列进行修改操作，否则会报错**/
+								int index = -1;
+								for (Tuple<DTNHost, Double> t : PriorityQueue){
+									if (t.getKey() == eachNeighborHost){
+										index = PriorityQueue.indexOf(t);
+									}
+								}
+								/**注意，在上面对PriorityQueue队列进行迭代的时候，不能够在for循环里面对此队列进行修改操作，否则会报错**/
+								if (index > -1){
+									PriorityQueue.remove(index);
+									PriorityQueue.add(new Tuple<DTNHost, Double>(eachNeighborHost, time));
+									arrivalTime.put(eachNeighborHost, time);
+									routerTable.put(eachNeighborHost, path);
+								}
+							}
+						}
+						/**检查队列中是否已有通过此网格的路径，如果有，看哪个时间更短**/
+					}
+					else{						
+						PriorityQueue.add(new Tuple<DTNHost, Double>(eachNeighborHost, time));
+						arrivalTime.put(eachNeighborHost, time);
+						routerTable.put(eachNeighborHost, path);
+					}
+					/**对队列进行排序**/
+					sortBasedOnDTNHost(PriorityQueue);					
+					updateLabel = true;
+				}
+			}
+			iteratorTimes++;
+			for (int i = 0; i < PriorityQueue.size(); i++){
+				if (!sourceSet.contains(PriorityQueue.get(i).getKey())){
+					sourceSet.add(PriorityQueue.get(i).getKey());//将新的最短网格加入
+					break;
+				}
+			}
+				
+//			if (netgridRouterTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
+//				break;
+		}
+		routerTableUpdateLabel = true;
+		
+
+	}
 
 
 	public int transmitFeasible(DTNHost destination){//传输可行性,判断是不是已有到目的节点的路径，同时还要保证此路径的存在时间大于传输所需时间
@@ -787,6 +1074,7 @@ public class SPNR extends ActiveRouter{
 		
 		return distance;
 	}
+	
 	/**
 	 * 根据节点地址找到，与此节点相连的连接
 	 * @param address
@@ -819,7 +1107,7 @@ public class SPNR extends ActiveRouter{
 				
 				/**路由找到的路径可能出现错误，导致当前路径不可用**/
 				if (connect == null) 
-					return null;
+					continue;
 				/**路由找到的路径可能出现错误，导致当前路径不可用**/
 				
 				if (connect.getOtherInterface(this.getHost().getInterface(1)).getHost() == destination)
@@ -877,7 +1165,7 @@ public class SPNR extends ActiveRouter{
 		/**检查所经过路径的情况，如果下一跳的链路已经被占用，则需要等待**/
 		if (con.isTransferring()){
 			this.busyLabel.put(t.getKey().getId(), con.getRemainingByteCount()/con.getSpeed() + SimClock.getTime());
-			System.out.println(this.getHost()+"  "+t.getKey()+"  "+
+			System.out.println("isBusy  "+this.getHost()+"  "+t.getKey()+"  "+
 					t.getValue().getOtherNode(this.getHost())+" "+con+"  "+this.busyLabel.get(t.getKey().getId()));			
 			return true;//说明目的节点正忙
 		}
@@ -892,11 +1180,14 @@ public class SPNR extends ActiveRouter{
 	public boolean sendMsg(Tuple<Message, Connection> t){
 		if (t == null){	
 			//throw new SimError("error! ");//如果确实是需要等待未来的一个节点就等，先传下一个,待修改!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			System.out.println("error");
 			return false;
 		}
 		else{
-			if (hostIsBusyOrNot(t) == true)//假设目的节点处于忙的状态
+			if (hostIsBusyOrNot(t) == true){//假设目的节点处于忙的状态
+				//System.out.println("busy");
 				return false;//发送失败，需要等待
+			}								
 			if (tryMessageToConnection(t) != null)//列表第一个元素从0指针开始！！！	
 				return true;//只要成功传一次，就跳出循环
 			else
@@ -1144,6 +1435,35 @@ public class SPNR extends ActiveRouter{
 			//return cellFromCoord(host.getCoordinate(time));
 		}
 		/**
+		 * 获取当前仿真时间下，指定网格的邻居网格内所含有的所有邻居节点
+		 * @param source
+		 * @param time
+		 * @return
+		 */
+		public List<DTNHost> getNeighborsHostsNow(GridCell source){//获取指定时间的邻居节点(同时包含预测到TTL时间内的邻居)	
+			//HashMap<NetworkInterface, GridCell> ginterfaces = gridmap.get(time);
+			//GridCell cell = this.interfaceToGridCell.get(host.getInterface(1));
+			int[] number = source.getNumber();//得到本网格的三维坐标
+			
+			List<GridCell> cellList = getNeighborCells(number[0], number[1], number[2]);//所有邻居的网格（当前时刻）
+			/**找出所有的邻居网格以及其包含的节点**/
+
+			/**去除本网格**/
+			if (cellList.contains(source))
+				cellList.remove(source);
+			
+			List<DTNHost> neighborHosts = new ArrayList<DTNHost>();
+			
+			for (GridCell c : cellList){
+				if (this.gridCellToHosts.containsKey(c)){//如果不包含，这说明此邻居网格为空，里面不含任何节点
+					neighborHosts.addAll(this.gridCellToHosts.get(c));//找出这一个邻居网格内对应的所有节点
+				}
+			}	
+			
+			//System.out.println(host+" 邻居列表   "+hostList);
+			return neighborHosts;
+		}
+		/**
 		 * 获取指定时间点，指定网格的邻居网格
 		 * @param source
 		 * @param time
@@ -1327,39 +1647,40 @@ public class SPNR extends ActiveRouter{
 						}
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				int m = 1;//默认m = 1;
+				for (int j = -m; j <= m; j += 1){
+					for (int k = -m; k <= m; k += 1){
 						if (boundaryCheck(row+4,col+j,z+k)){
 							GC.add(cells[row+4][col+j][z+k]);
 						}
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -m; j <= m; j += 1){
+					for (int k = -m; k <= m; k += 1){
 						if (boundaryCheck(row-4,col+j,z+k))
 							GC.add(cells[row-4][col+j][z+k]);
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -m; j <= m; j += 1){
+					for (int k = -m; k <= m; k += 1){
 						if (boundaryCheck(row+j,col+4,z+k))
 							GC.add(cells[row+j][col+4][z+k]);
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -m; j <= m; j += 1){
+					for (int k = -m; k <= m; k += 1){
 						if (boundaryCheck(row+j,col-4,z+k))
 							GC.add(cells[row+j][col-4][z+k]);
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -m; j <= m; j += 1){
+					for (int k = -m; k <= m; k += 1){
 						if (boundaryCheck(row+j,col+k,z+4))
 							GC.add(cells[row+j][col+k][z+4]);
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -m; j <= m; j += 1){
+					for (int k = -m; k <= m; k += 1){
 						if (boundaryCheck(row+j,col+k,z-4))
 							GC.add(cells[row+j][col+k][z-4]);
 					}
@@ -1387,89 +1708,90 @@ public class SPNR extends ActiveRouter{
 						}
 					}
 				}
-				for (int j = -2; j < 3; j += 1){
-					for (int k = -2; k < 3; k += 1){
+				int n1 = 2;//默认n1 = 2;
+				for (int j = -n1; j <= n1; j += 1){
+					for (int k = -n1; k <= n1; k += 1){
 						if (boundaryCheck(row+8,col+j,z+k)){
 							GC.add(cells[row+8][col+j][z+k]);
 
 						}
 					}
 				}
-				for (int j = -2; j < 3; j += 1){
-					for (int k = -2; k < 3; k += 1){
+				for (int j = -n1; j <= n1; j += 1){
+					for (int k = -n1; k <= n1; k += 1){
 						if (boundaryCheck(row-8,col+j,z+k))
 							GC.add(cells[row-8][col+j][z+k]);
 
 					}
 				}
-				for (int j = -2; j < 3; j += 1){
-					for (int k = -2; k < 3; k += 1){
+				for (int j = -n1; j <= n1; j += 1){
+					for (int k = -n1; k <= n1; k += 1){
 						if (boundaryCheck(row+j,col+8,z+k))
 							GC.add(cells[row+j][col+8][z+k]);
 
 					}
 				}
-				for (int j = -2; j < 3; j += 1){
-					for (int k = -2; k < 3; k += 1){
+				for (int j = -n1; j <= n1; j += 1){
+					for (int k = -n1; k <= n1; k += 1){
 						if (boundaryCheck(row+j,col-8,z+k))
 							GC.add(cells[row+j][col-8][z+k]);
 
 					}
 				}
-				for (int j = -2; j < 3; j += 1){
-					for (int k = -2; k < 3; k += 1){
+				for (int j = -n1; j <= n1; j += 1){
+					for (int k = -n1; k <= n1; k += 1){
 						if (boundaryCheck(row+j,col+k,z+8))
 							GC.add(cells[row+j][col+k][z+8]);
 
 					}
 				}
-				for (int j = -2; j < 3; j += 1){
-					for (int k = -2; k < 3; k += 1){
+				for (int j = -n1; j <= n1; j += 1){
+					for (int k = -n1; k <= n1; k += 1){
 						if (boundaryCheck(row+j,col+k,z-8))
 							GC.add(cells[row+j][col+k][z-8]);
 
 					}
 				}
 				//
-				
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				int n2 = 1;//默认n2 = 1;
+				for (int j = -n2; j <= n2; j += 1){
+					for (int k = -n2; k <= n2; k += 1){
 						if (boundaryCheck(row+9,col+j,z+k)){
 							GC.add(cells[row+9][col+j][z+k]);
 
 						}
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -n2; j <= n2; j += 1){
+					for (int k = -n2; k <= n2; k += 1){
 						if (boundaryCheck(row-9,col+j,z+k))
 							GC.add(cells[row-9][col+j][z+k]);
 
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -n2; j <= n2; j += 1){
+					for (int k = -n2; k <= n2; k += 1){
 						if (boundaryCheck(row+j,col+9,z+k))
 							GC.add(cells[row+j][col+9][z+k]);
 
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -n2; j <= n2; j += 1){
+					for (int k = -n2; k <= n2; k += 1){
 						if (boundaryCheck(row+j,col-9,z+k))
 							GC.add(cells[row+j][col-9][z+k]);
 
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -n2; j <= n2; j += 1){
+					for (int k = -n2; k <= n2; k += 1){
 						if (boundaryCheck(row+j,col+k,z+9))
 							GC.add(cells[row+j][col+k][z+9]);
 
 					}
 				}
-				for (int j = -1; j < 2; j += 1){
-					for (int k = -1; k < 2; k += 1){
+				for (int j = -n2; j <= n2; j += 1){
+					for (int k = -n2; k <= n2; k += 1){
 						if (boundaryCheck(row+j,col+k,z-9))
 							GC.add(cells[row+j][col+k][z-9]);
 

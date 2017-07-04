@@ -135,8 +135,10 @@ public class ContactGraphInterface  extends NetworkInterface {
 			if (connections.get(0).getOtherNode(this.getHost()).equals(to))
 				return;
 		}
-		else
-			connect(to.getInterface(1));
+		else{
+			if (!interruptHostsList.contains(to))
+				connect(to.getInterface(1));
+		}
 
 		List<Connection> needToRemove = new ArrayList<Connection>();//记录需要移除的链路
 		
@@ -151,6 +153,10 @@ public class ContactGraphInterface  extends NetworkInterface {
 				disconnect(con,anotherInterface);
 				needToRemove.add(connections.get(i));
 		
+			}
+			if (interruptHostsList.contains(con.getOtherNode(this.getHost()))) {	//检查需要断开连接的节点列表，用于全局链路中断的情况
+				disconnect(con,anotherInterface);
+				needToRemove.add(connections.get(i));
 			}
 			if (!isWithinRange(anotherInterface)) {//更新节点位置后，检查之前维护的连接是否会因为太远而断掉
 				disconnect(con,anotherInterface);
@@ -189,8 +195,24 @@ public class ContactGraphInterface  extends NetworkInterface {
 //		//System.out.println(this.getHost()+"  interface  "+SimClock.getTime()+" this time  "+this.connections);
 //		//this.getHost().getNeighbors().updateNeighbors(this.getHost(), this.connections);//更新邻居节点数据库
 		
+		clearInterruptHostsList();//清除需要断开连接的节点列表
 	}
-
+	/**需要断开连接的节点列表**/
+	private List<DTNHost> interruptHostsList = new ArrayList<DTNHost>();
+	/**
+	 * 设置需要断开连接的节点列表
+	 * @param ih
+	 * @return
+	 */
+	public boolean setInterruptHost(DTNHost ih){
+		return interruptHostsList.add(ih);
+	}
+	/**
+	 * 清除需要断开连接的节点列表
+	 */
+	public void clearInterruptHostsList(){
+		this.interruptHostsList.clear();
+	}
 	
 	/** 
 	 * Creates a connection to another host. This method does not do any checks

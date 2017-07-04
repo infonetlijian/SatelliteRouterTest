@@ -595,13 +595,17 @@ public class SimScenario implements Serializable {
 		//this.parameters[0]=8000.0;
 		parameters[1]= 0;//0.1偏心率，影响较大,e=c/a
 		parameters[2]= 86.4;//64.8;
-		//parameters[2] = random.nextInt(15);
-		//parameters[3] = random.nextInt(15);
-		parameters[3]= (360/NROF_PLANE)*(m/NROF_S_EACHPLANE);//0.0;
-		parameters[4]= (360/NROF_S_EACHPLANE)*((m-(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE) - 1) + (360/NROF_SATELLITES)*(m/NROF_S_EACHPLANE);//0.0;
-		parameters[5]= 0;//86.4;//0.0;
+		parameters[3]= (360/NROF_S_EACHPLANE)*(Math.floor(m/NROF_S_EACHPLANE) + 1);//m从0开始
+		parameters[4]= 0;
+		if ((Math.floor(m/NROF_S_EACHPLANE) + 1) % 2 == 1 )
+			parameters[5] = (360/NROF_S_EACHPLANE)*(m-Math.floor(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE);
+		else
+			parameters[5] = (360/NROF_S_EACHPLANE)*(m-Math.floor(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE + 0.5);
+		//parameters[4]= (360/period)*((m-Math.floor(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE)) + (360/period)*NROF_PLANE*(Math.floor(m/NROF_S_EACHPLANE));
+		//parameters[4]= (360/NROF_S_EACHPLANE)*((m-Math.floor(m/NROF_S_EACHPLANE)*NROF_S_EACHPLANE)) + (360/NROF_SATELLITES)*(Math.floor(m/NROF_S_EACHPLANE));
+		//parameters[5]= 0.0;
 		
-		System.out.println(m);
+		System.out.println(m + "  " + parameters[3] + "  " +parameters[4] + "  " + parameters[5]);
 		//nrofPlane = m/NROF_S_EACHPLANE + 1;//卫星所属轨道平面编号
 		//nrofSatelliteINPlane = m - (nrofPlane - 1) * NROF_S_EACHPLANE;//卫星在轨道平面内的编号
 		

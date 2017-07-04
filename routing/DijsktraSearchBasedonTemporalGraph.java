@@ -102,6 +102,22 @@ public class DijsktraSearchBasedonTemporalGraph extends ActiveRouter{
 		return new DijsktraSearchBasedonTemporalGraph(this);
 	}
 	/**
+	 * 在Networkinterface类中执行链路中断函数disconnect()后，对应节点的router调用此函数
+	 */
+	@Override
+	public void changedConnection(Connection con){
+		super.changedConnection(con);
+//		System.out.println("message: "+con);
+//		if (!con.isUp()){
+//			if(con.isTransferring()){
+//				if (con.getOtherNode(this.getHost()).getRouter().isIncomingMessage(con.getMessage().getId()))
+//					con.getOtherNode(this.getHost()).getRouter().removeFromIncomingBuffer(con.getMessage().getId(), this.getHost());
+//				super.addToMessages(con.getMessage(), false);//对于因为链路中断而丢失的消息，重新放回发送方的队列中，并且删除对方节点的incoming信息
+//				System.out.println("message: "+con.getMessage());
+//			}
+//		}
+	}
+	/**
 	 * 路由更新，每次调用路由更新时的主入口
 	 */
 	@Override

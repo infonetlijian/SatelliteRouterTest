@@ -348,10 +348,11 @@ abstract public class NetworkInterface implements ModuleCommunicationListener {
 		notifyConnectionListeners(CON_DOWN, anotherInterface.getHost());
 
 		// tear down bidirectional connection
-//		if (!anotherInterface.getConnections().remove(con)) {
+		//运行CGR路由算法时，此处会报错
+		if (!anotherInterface.getConnections().remove(con)) {
 //			throw new SimError("No connection " + con + " found in " +
 //					anotherInterface);	
-//		}
+		}
 
 		this.host.connectionDown(con);
 		anotherInterface.getHost().connectionDown(con);

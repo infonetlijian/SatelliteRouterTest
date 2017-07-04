@@ -103,87 +103,10 @@ public class CPUcycle_test {
 		System.out.println("cost:  "+ (t1-t0));
 	}
 	
-	public static void reading_operation(){
-		DTNHost host = new DTNHost();
-	}
-	public void updateGrid_without_OrbitCalculation(){
-		if (gridLocation.isEmpty())//初始化只执行一次
-			initializeGridLocation();
-		
-		ginterfaces.clear();//每次清空
-		//Coord location = new Coord(0,0); 	// where is the host
-		double simClock = SimClock.getTime();
-		double time = simClock;
-		
-			HashMap<GridCell, List<DTNHost>> cellToHost= new HashMap<GridCell, List<DTNHost>>();
-			for (DTNHost host : hosts){
-				List<GridCell> gridCellList = this.gridLocation.get(host);
-				List<Double> timeList = this.gridTime.get(host);
-				double period = this.periodMap.get(host);
-				double t0 = time;
-				GridCell cell = new GridCell();
-				boolean label = false;
-				int iterator = 0;
-				if (time >= period)
-					t0 = t0 % period;//大于周期就取余操作
-				for (double t : timeList){
-					if (t >= t0){
-						cell = gridCellList.get(iterator);
-						label = true;
-						break;
-					}
-					iterator++;//找到与timeList时间对应的网格所在位置,iterator 代表在这两个list中的指针						
-				}				
-				//System.out.println(host+" number "+cell.getNumber()[0]+cell.getNumber()[1]+cell.getNumber()[2]);
-				//System.out.println(host+" error!!! "+label);
-				assert label : "grid calculation error";
-				
-				this.ginterfaces.put(host.getInterface(1), cell);
-				
-				List<DTNHost> hostList = new ArrayList<DTNHost>();
-				if (cellToHost.containsKey(cell)){
-					hostList = cellToHost.get(cell);	
-				}
-				hostList.add(host);
-				cellToHost.put(cell, hostList);
-			}		
-			cellmap.put(time, cellToHost);
-			gridmap.put(time, ginterfaces);//预测未来time时间里节点和网格之间的对应关系
-			//ginterfaces.clear();//每次清空
-			ginterfaces = new HashMap<NetworkInterface, GridCell>();//每次清空
-			//CreateGrid(cellSize);//包含cells的new和ginterfaces的new
-	}
+
+
 	
-	public void initializeGridLocation(){	
-		this.host.getHostsList();
-		for (DTNHost h : this.host.getHostsList()){//對每個節點遍歷一個週期，記錄其一個週期內遍歷過的網格，并找到對應的進入和離開時間
-			double period = getPeriodofOrbit(h);
-			this.periodMap.put(h, period);
-			System.out.println(this.host+" now calculate "+h+"  "+period);
-			
-			List<GridCell> gridList = new ArrayList<GridCell>();
-			List<Double> intoTime = new ArrayList<Double>();
-			List<Double> outTime = new ArrayList<Double>();
-			GridCell startCell;//记录起始网格
-			for (double time = 0; time < period; time += updateInterval){
-				Coord c = h.getCoordinate(time);
-				GridCell gc = cellFromCoord(c);//根據坐標找到對應的網格
-				if (!gridList.contains(gc)){
-					if (gridList.isEmpty())
-						startCell = gc;//记录起始网格
-					gridList.add(gc);//第一次检测到节点进入此网格（注意，边界检查！！！开始和结束的时候！！！!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!）
-					intoTime.add(time);//记录相应的进入时间
-				}	
-				else{
-					//if (gc. == startCell)
-						//intoTime = time;
-				}
-			}
-			gridLocation.put(h, gridList);//遍历完一个节点就记录下来
-			gridTime.put(h, intoTime);
-		}
-		System.out.println(gridLocation);
-	}
+
 	
 	public class GridCell {
 		// how large array is initially chosen

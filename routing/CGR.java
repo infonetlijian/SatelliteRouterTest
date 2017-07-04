@@ -122,6 +122,21 @@ public class CGR extends ActiveRouter{
 		return new CGR(this);
 	}
 	/**
+	 * 在Networkinterface类中执行链路中断函数disconnect()后，对应节点的router调用此函数
+	 */
+	@Override
+	public void changedConnection(Connection con){
+		super.changedConnection(con);
+
+//		if (!con.isUp()){
+//			if(con.isTransferring()){
+//				if (con.getOtherNode(this.getHost()).getRouter().isIncomingMessage(con.getMessage().getId()))
+//					con.getOtherNode(this.getHost()).getRouter().removeFromIncomingBuffer(con.getMessage().getId(), this.getHost());
+//				super.addToMessages(con.getMessage(), false);//对于因为链路中断而丢失的消息，重新放回发送方的队列中，并且删除对方节点的incoming信息
+//			}
+//		}
+	}
+	/**
 	 * 路由更新，每次调用路由更新时的主入口
 	 */
 	@Override
@@ -250,13 +265,14 @@ public class CGR extends ActiveRouter{
 		if (nextHopAddress > -1){
 			Connection nextCon = findConnection(nextHopAddress);
 			if (nextCon == null){//能找到路径信息，但是却没能找到连接
-				if (!waitLable){//检查是不是有预测邻居链路
-					System.out.println(this.getHost()+"  "+msg+" 指定路径失效");
-					msg.removeProperty(this.MSG_ROUTERPATH);//清除原先路径信息!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-					Tuple<Message, Connection> t = 
-							findPathFromRouterTabel(msg, this.getConnections(), true);//清除原先路径信息之后再重新寻路
-					return t;
-				}
+				//说明是未来的contact，信息等待
+//				if (!waitLable){//检查是不是有预测邻居链路
+//					System.out.println(this.getHost()+"  "+msg+" 指定路径失效");
+//					msg.removeProperty(this.MSG_ROUTERPATH);//清除原先路径信息!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//					Tuple<Message, Connection> t = 
+//							findPathFromRouterTabel(msg, this.getConnections(), true);//清除原先路径信息之后再重新寻路
+//					return t;
+//				}
 			}else{
 				Tuple<Message, Connection> t = new 
 						Tuple<Message, Connection>(msg, nextCon);
@@ -416,7 +432,7 @@ public class CGR extends ActiveRouter{
 		double TNMCostTime = 0;//测试算法运行时间用
 		
 		while(true){//Dijsktra算法思想，每次历遍全局，找时延最小的加入路由表，保证路由表中永远是时延最小的路径
-			if (iteratorTimes >= size )//|| updateLabel == false)
+			if (iteratorTimes >= size)// || updateLabel == false)
 				break; 
 			updateLabel = false;
 
@@ -524,7 +540,7 @@ public class CGR extends ActiveRouter{
 			}
 				
 //			if (routerTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
-//				break;
+//				return;
 		}
 		routerTableUpdateLabel = true;
 		

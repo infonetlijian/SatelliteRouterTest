@@ -8,7 +8,8 @@ import input.EventQueue;
 import input.ExternalEvent;
 import input.ScheduledUpdatesQueue;
 import interfaces.ConnectivityOptimizer;
-import interfaces.SimpleSatelliteInterface;
+import interfaces.ContactGraphInterface;
+import interfaces.EnableInterruptionsInterface;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -68,6 +69,8 @@ public class World {
 	private boolean isConSimulated;
 	
 	/*修改参数部分!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+	boolean initInterruptionLabel = false;
+	List<Tuple<DTNHost, Double>> InterruptionList;
 	private Neighbors neighbor;//新增
 	private HashMap<DTNHost, DTNHost> connectedHosts = new HashMap<DTNHost, DTNHost>();
 	/** router mode in the sim -setting id ({@value})*/
@@ -202,6 +205,21 @@ public class World {
 		
 		setNextEventQueue();//产生下一个消息事件（但消息实际上还没有产生），同时把最早需要处理的事件队列拿出来
 
+//		/**添加随机链路中断的代码**/
+//		if (this.InterruptionList == null && this.initInterruptionLabel == false){
+//			this.InterruptionList = initInterruption();//存储预先设计的中断方案
+//		}			
+//		if (!this.InterruptionList.isEmpty()){
+//			if (simClock.getTime() >= this.InterruptionList.get(0).getValue()){
+//				DTNHost selectedHost = this.InterruptionList.get(0).getKey();
+//				interruptHostsConnection(selectedHost);
+//				this.InterruptionList.remove(0);
+//				//throw new SimError("Interrupt!!!");
+//			}	
+//		}
+		randomlyInterrupt();
+		/**添加随机链路中断的代码**/
+		
 		//this.neighbor=new Neighbors(this.hosts);//新增函数
 		
 		//此循环处理在一个更新周期内的事件
@@ -443,9 +461,7 @@ public class World {
 			for (int i=0, n = hosts.size();i < n; i++) {
 				if (this.isCancelled) {
 					break;
-				}			
-				//this.neighbor.CalculateNeighbor(this.hosts.get(i), SimClock.getTime());//新增函数，更新每个卫星的邻居节点列表
-							
+				}										
 				hosts.get(i).update(simulateConnections);
 			}
 		}
@@ -457,8 +473,7 @@ public class World {
 			for (int i=0, n = hosts.size();i < n; i++) {
 				if (this.isCancelled) {
 					break;
-				}
-				//this.neighbor.CalculateNeighbor(this.updateOrder.get(i), SimClock.getTime());//新增函数，更新每个卫星的邻居节点列表
+				}			
 				this.updateOrder.get(i).update(simulateConnections);
 			}			
 		}
@@ -467,7 +482,157 @@ public class World {
 			simulateConnections = false;
 		}
 	}
+	
+	public List<Tuple<DTNHost, Double>> initInterruption(){
+		/**添加随机链路中断的代码**/
 
+		Settings scenario = new Settings("Scenario");
+		double endTime = scenario.getDouble("endTime");
+		double updateInterval = scenario.getDouble("updateInterval");
+		Settings setting = new Settings("Interface");
+		double probabilityOfInterrupt = setting.getDouble("probabilityOfInterrupt");//读取用户设置的链路中断概率
+		
+		List<Tuple<DTNHost, Double>> InterruptionList = new ArrayList<Tuple<DTNHost, Double>>();//存储预先设计的中断方案
+		
+		for (double simTime = 0; simTime <= endTime; simTime += updateInterval){
+			if (probabilisticInterrupt(probabilityOfInterrupt)){
+				Random random = new Random();
+				
+				int selectedNum = random.nextInt(hosts.size());
+				selectedNum = Math.abs(selectedNum == 0 ? 0 : selectedNum - 1);
+				DTNHost selectedHost = hosts.get(selectedNum);			
+				Tuple<DTNHost, Double> Interruption = new Tuple<DTNHost, Double>(selectedHost, simTime);
+				InterruptionList.add(Interruption);
+			}
+		}
+		this.initInterruptionLabel = true;
+		return InterruptionList;
+	}
+	/**
+	 * 随机产生链路中断情况
+	 */
+	public void randomlyInterrupt(){
+		/**添加随机链路中断的代码**/
+		Settings setting = new Settings("Interface");
+		double probabilityOfInterrupt = setting.getDouble("probabilityOfInterrupt");//读取用户设置的链路中断概率
+		
+		List<Tuple<Connection, DTNHost>> transferringConnectionList = new ArrayList<Tuple<Connection, DTNHost>>();
+		/**找到任意时刻的全网链路Connection**/
+		HashMap<Connection, DTNHost> allConnectionList = new HashMap<Connection, DTNHost>();
+		for (DTNHost h : this.hosts){
+			for (Connection con : h.getConnections()){			
+				if (!allConnectionList.containsKey(con)){
+					allConnectionList.put(con, h);
+				}
+			}		
+		}
+		/**全局链路概率性中断**/
+		for (Connection con : allConnectionList.keySet()){
+			if (probabilisticInterrupt(probabilityOfInterrupt)){
+				/**有正在的传的链路就直接终止传输**/
+				if (con.isTransferring())
+					con.abortTransfer();
+				DTNHost selectedHost = allConnectionList.get(con);
+				DTNHost anotherHost = con.getOtherNode(selectedHost);
+				selectedHost.connectionDown(con);
+				anotherHost.connectionDown(con);
+				String interfaceType = setting.getSetting("type");
+				if (interfaceType.endsWith("ContactGraphInterface")){
+					/**设置需要中断的节点列表**/
+					((ContactGraphInterface)selectedHost.getInterface(1)).setInterruptHost(anotherHost);
+					((ContactGraphInterface)anotherHost.getInterface(1)).setInterruptHost(selectedHost);
+				}
+				if (interfaceType.endsWith("EnableInterruptionsInterface")){
+					/**设置需要中断的节点列表**/
+					((EnableInterruptionsInterface)selectedHost.getInterface(1)).setInterruptHost(anotherHost);
+					((EnableInterruptionsInterface)anotherHost.getInterface(1)).setInterruptHost(selectedHost);
+				}
+			}
+		}
+//		if (probabilisticInterrupt(probabilityOfInterrupt)){
+//			Random random = new Random();
+//			int chosenHost = random.nextInt(hosts.size());
+//			chosenHost = Math.abs(chosenHost == 0 ? 0 : chosenHost - 1);
+//			if (hosts.get(chosenHost).getConnections().size() <= 0)
+//				return;
+//			int chosenConnection = random.nextInt(hosts.get(chosenHost).getConnections().size());
+//			chosenConnection = Math.abs(chosenConnection == 0 ? 0 : chosenConnection - 1);
+//			Connection chosenOne = hosts.get(chosenHost).getConnections().get(chosenConnection);
+//			NetworkInterface chosenInterface = hosts.get(chosenHost).getInterface(1); 
+//			NetworkInterface anotherInterface = chosenOne.getOtherInterface(chosenInterface);
+//			//System.out.println("Interrupt! + " + hosts.get(chosenHost) + "   " + chosenOne);
+//			chosenInterface.disconnect(chosenOne, anotherInterface);//断开连接
+//			hosts.get(chosenHost).getConnections().remove(chosenConnection);			
+//		}
+		/**添加随机链路中断的代码**/
+	}
+	public boolean interruptHostsConnection(DTNHost selectedHost){
+		
+		List<Tuple<Connection, DTNHost>> transferringConnectionList = new ArrayList<Tuple<Connection, DTNHost>>();
+		for (DTNHost h : this.hosts){
+			for (Connection con : h.getConnections()){
+				if (con.isTransferring()){
+					transferringConnectionList.add(new Tuple(con, h));
+				}
+			}		
+		}
+		if (!transferringConnectionList.isEmpty()){
+			int selectedNum = random.nextInt(transferringConnectionList.size());
+			selectedNum = Math.abs(selectedNum == 0 ? 0 : selectedNum - 1);
+			Tuple<Connection, DTNHost> t = transferringConnectionList.get(selectedNum);
+			NetworkInterface selectedInterface = t.getValue().getInterface(1);
+			Connection selectedConnection = t.getKey();
+			NetworkInterface anotherInterface = selectedConnection.getOtherInterface(selectedInterface);
+		
+			//selectedInterface.disconnect(selectedConnection, anotherInterface);//断开连接
+			selectedConnection.abortTransfer();
+			selectedHost.getInterface(1).destroyConnection(anotherInterface);
+			//selectedInterface.connect(anotherInterface);//重新连接新的connection
+			//System.out.println("Interrupt! + " + selectedHost + "   " + selectedConnection.getMessage());		
+			return true;
+		}
+
+		if (selectedHost.getConnections().size() <= 0)
+			return false;
+		int selectedNum = random.nextInt(selectedHost.getConnections().size());
+		selectedNum = Math.abs(selectedNum == 0 ? 0 : selectedNum - 1);
+		Connection selectedConnection = selectedHost.getConnections().get(selectedNum);
+		NetworkInterface selectedInterface = selectedHost.getInterface(1); 
+		NetworkInterface anotherInterface = selectedConnection.getOtherInterface(selectedInterface);
+		//System.out.println("Interrupt! + " + selectedHost + "   ");	
+		//System.out.println(selectedHost + "  " + selectedConnection + "  contains? " + selectedHost.getConnections().contains(selectedConnection) + "  " + anotherInterface.getConnections().contains(selectedConnection));	
+		//selectedInterface.disconnect(selectedConnection, anotherInterface);//断开连接
+		selectedHost.getInterface(1).destroyConnection(anotherInterface);
+		//anotherInterface.getConnections().remove(selectedConnection);
+		//selectedHost.getInterface(1).getConnections().remove(selectedConnection);
+		//System.out.println(selectedHost + "  " + selectedConnection + "  contains? " + selectedHost.getConnections().contains(selectedConnection) + " "  + anotherInterface.getConnections().contains(selectedConnection));	
+		//selectedInterface.connect(anotherInterface);//重新连接新的connection
+//		System.out.println(selectedHost + "  " + selectedConnection + " isUp? "+ selectedConnection.isUp() + " contains?  " + selectedHost.getConnections().contains(selectedConnection)+ " "  + anotherInterface.getConnections().contains(selectedConnection));
+//		DTNHost anotherHost = anotherInterface.getHost();
+//		for (int i=0; i < selectedHost.getConnections().size(); i++) {
+//			if (selectedHost.getConnections().get(i).getOtherNode(selectedHost) == anotherHost){
+//				selectedConnection = selectedHost.getConnections().get(i);
+//			}
+//		}
+//		System.out.println(selectedHost + "  " + selectedConnection + " isUp? "+ selectedConnection.isUp() + " contains?  " + selectedHost.getConnections().contains(selectedConnection)+ " "  + anotherInterface.getConnections().contains(selectedConnection));	
+		//anotherInterface.getConnections().remove(selectedConnection);
+		//selectedHost.getConnections().remove(selectedConnection);	
+		return true;
+	}
+	/**
+	 * 随机概率中断函数，输入的概率值需在0到1之间
+	 * @param probabilityOfInterrupt
+	 * @return
+	 */
+	public boolean probabilisticInterrupt(double probabilityOfInterrupt){		
+		double roll = random.nextDouble();//随机产生0到1之间的数
+		
+		if (roll < probabilityOfInterrupt)
+			return true;			
+		else
+			return false;
+	}
+	
 	/**
 	 * Moves all hosts in the world for a given amount of time
 	 * @param timeIncrement The time how long all nodes should move

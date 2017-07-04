@@ -17,7 +17,7 @@ import core.SimClock;
  * A simple Network Interface that provides a constant bit-rate service, where
  * one transmission can be on at a time.
  */
-public class SimpleSatelliteInterface  extends NetworkInterface {
+public class EnableInterruptionsInterface  extends NetworkInterface {
 	
 	//新增
 	/** router mode in the sim -setting id ({@value})*/
@@ -30,7 +30,7 @@ public class SimpleSatelliteInterface  extends NetworkInterface {
 	/**
 	 * Reads the interface settings from the Settings file
 	 */
-	public SimpleSatelliteInterface(Settings s)	{
+	public EnableInterruptionsInterface(Settings s)	{
 		super(s);
 	}
 		
@@ -38,12 +38,12 @@ public class SimpleSatelliteInterface  extends NetworkInterface {
 	 * Copy constructor
 	 * @param ni the copied network interface object
 	 */
-	public SimpleSatelliteInterface(SimpleSatelliteInterface ni) {
+	public EnableInterruptionsInterface(EnableInterruptionsInterface ni) {
 		super(ni);
 	}
 
 	public NetworkInterface replicate()	{
-		return new SimpleSatelliteInterface(this);
+		return new EnableInterruptionsInterface(this);
 	}
 
 	/**
@@ -99,12 +99,12 @@ public class SimpleSatelliteInterface  extends NetworkInterface {
 			// all connections should be up at this stage
 			assert con.isUp() : "Connection " + con + " was down!";
 
-			if (!isWithinRange(anotherInterface)) {//更新节点位置后，检查之前维护的连接是否会因为太远而断掉
+			if (!isWithinRange(anotherInterface) || 									//更新节点位置后，检查之前维护的连接是否会因为太远而断掉
+					interruptHostsList.contains(con.getOtherNode(this.getHost()))) {	//检查需要断开连接的节点列表，用于全局链路中断的情况
 				disconnect(con,anotherInterface);
 				connections.remove(i);
-				
 				//neighbors.removeNeighbor(con.getOtherNode(this.getHost()));//在断掉连接的同时移除在邻居列表里的邻居节点，新增！！！
-			}
+			}			
 			else {
 				i++;
 			}
@@ -117,7 +117,8 @@ public class SimpleSatelliteInterface  extends NetworkInterface {
 			Collection<NetworkInterface> interfaces =//无需调用optimizer.getNearInterfaces(this)来获取邻居节点了，现在连接的建立全部放在world。java当中进行
 				optimizer.getNearInterfaces(this);
 			for (NetworkInterface i : interfaces) {
-				connect(i);
+				if (!interruptHostsList.contains(i.getHost()))
+					connect(i);
 				//neighbors.addNeighbor(i.getHost());
 			}
 			break;
@@ -134,9 +135,25 @@ public class SimpleSatelliteInterface  extends NetworkInterface {
 
 		//System.out.println(this.getHost()+"  interface  "+SimClock.getTime()+" this time  "+this.connections);
 		//this.getHost().getNeighbors().updateNeighbors(this.getHost(), this.connections);//更新邻居节点数据库
-		
+		/**每一个时刻都将需要断开连接的节点列表清空**/
+		clearInterruptHostsList();
 	}
-
+	/**需要断开连接的节点列表**/
+	private List<DTNHost> interruptHostsList = new ArrayList<DTNHost>();
+	/**
+	 * 设置需要断开连接的节点列表
+	 * @param ih
+	 * @return
+	 */
+	public boolean setInterruptHost(DTNHost ih){
+		return interruptHostsList.add(ih);
+	}
+	/**
+	 * 清除需要断开连接的节点列表
+	 */
+	public void clearInterruptHostsList(){
+		this.interruptHostsList.clear();
+	}
 	
 	/** 
 	 * Creates a connection to another host. This method does not do any checks
