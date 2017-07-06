@@ -86,6 +86,8 @@ public class SPNRmodify extends ActiveRouter{
 	private GridNeighbors GN;
 	Random random = new Random();
 	double RoutingTimeNow;
+	
+	int algorithmRunningCount = 0;//核心路由算法调用次数计数器
 	/**
 	 * 初始化
 	 * @param s
@@ -114,6 +116,7 @@ public class SPNRmodify extends ActiveRouter{
 	 */
 	public void initialzation(){
 		GN.setHost(this.getHost());//为了实现GN和Router以及Host之间的绑定，待修改！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！！
+		initInterSatelliteNeighbors();//初始化记录节点在同一个轨道内的相邻节点，以及相邻平面的邻居
 		//this.GN.initializeGridLocation();
 	}	
 	/**
@@ -131,13 +134,135 @@ public class SPNRmodify extends ActiveRouter{
 			}
 		}
 	}
+	public List<DTNHost> neighborPlaneHosts = new ArrayList<DTNHost>();//相同轨道平面里的两个邻居节点
+	public List<DTNHost> neighborHostsInSamePlane = new ArrayList<DTNHost>();//相邻轨道平面内的两个邻居节点
+	/**
+	 * 处理initInterSatelliteNeighbors()函数中的边界值问题
+	 * @param n
+	 * @param upperBound
+	 * @param lowerBound
+	 * @return
+	 */
+	public int processBoundOfNumber(int n , int lowerBound, int upperBound){
+		if (n < lowerBound){
+			return n + upperBound + 1 + lowerBound;
+		}
+		if (n > upperBound){	
+			return n - upperBound - 1 + lowerBound;
+		}
+		return n;
+	}
+	/**
+	 * 处理在同一个平面内的节点编号，处在边界时的问题
+	 * @param n
+	 * @param nrofPlane
+	 * @param nrofSatelliteInOnePlane
+	 * @return
+	 */
+	public int processBound(int n ,int nrofPlane, int nrofSatelliteInOnePlane){
+		int startNumber = nrofSatelliteInOnePlane * (nrofPlane - 1);//此轨道平面内的节点，起始编号
+		int endNumber = nrofSatelliteInOnePlane * nrofPlane - 1;//此轨道平面内的节点，结尾编号
+		if (n < startNumber)
+			return endNumber;
+		if (n > endNumber)
+			return startNumber;
+		//int nrofPlane = n/nrofSatelliteInOnePlane + 1;
+		return n;
+	}
+	/**
+	 * 初始化设定本节点的同轨邻居节点
+	 */
+	public void initInterSatelliteNeighbors(){
+		Settings setting = new Settings("userSetting");
+		Settings sat = new Settings("Group");
+		int TOTAL_SATELLITES = sat.getInt("nrofHosts");//总节点数
+		int TOTAL_PLANE = setting.getInt("nrofPlane");//总轨道平面数
+		int NROF_S_EACHPLANE = TOTAL_SATELLITES/TOTAL_PLANE;//每个轨道平面上的节点数
+		
+		int thisHostAddress = this.getHost().getAddress();
+		
+		int upperBound = this.getHost().getHostsList().size() - 1;
+		int a = processBound(thisHostAddress + 1, thisHostAddress/NROF_S_EACHPLANE + 1, NROF_S_EACHPLANE);
+		int b = processBound(thisHostAddress - 1, thisHostAddress/NROF_S_EACHPLANE + 1, NROF_S_EACHPLANE);		
+		
+		for (DTNHost host : this.getHost().getHostsList()){
+			if (host.getAddress() == a || host.getAddress() == b){
+				neighborHostsInSamePlane.remove(host);
+				neighborHostsInSamePlane.add(host);//同一个轨道内的相邻节点
+			}
+		}
+	}
+	/**
+	 * 初始化设定本节点的相邻轨道的邻居节点(因为在边缘轨道平面时的简单对应关系存在一些问题，所以需要动态更新)
+	 */
+	public void updateInterSatelliteNeighbors(List<DTNHost> conNeighbors){
+		Settings setting = new Settings("userSetting");
+		Settings sat = new Settings("Group");
+		int TOTAL_SATELLITES = sat.getInt("nrofHosts");//总节点数
+		int TOTAL_PLANE = setting.getInt("nrofPlane");//总轨道平面数
+		int NROF_S_EACHPLANE = TOTAL_SATELLITES/TOTAL_PLANE;//每个轨道平面上的节点数
+		
+		int thisHostAddress = this.getHost().getAddress();
+		
+		int upperBound = this.getHost().getHostsList().size() - 1;
+		int c = processBoundOfNumber(thisHostAddress + NROF_S_EACHPLANE, 0, upperBound);
+		int d = processBoundOfNumber(thisHostAddress - NROF_S_EACHPLANE, 0, upperBound);
+		
+
+		for (DTNHost host : this.getHost().getHostsList()){
+			if (host.getAddress() == c){
+				if (!conNeighbors.contains(host)){
+					double minDistance = Double.MAX_VALUE;
+					DTNHost minHost = null;	
+					for (DTNHost neighborHost : conNeighbors){//如果不包含就从已有的c所属的轨道平面上的节点，选一个最近的
+						int planeOfC = c/NROF_S_EACHPLANE + 1;//两个相邻节点各自所属的轨道平面号
+						if (planeOfC == neighborHost.getNrofPlane()){
+							if (neighborHost.getLocation().distance(this.getHost().getLocation()) < minDistance)
+								minHost = neighborHost;
+						}
+					}
+					if (minHost != null){
+						neighborPlaneHosts.remove(minHost);//去重复添加
+						neighborPlaneHosts.add(minHost);
+					}
+				}
+				else{
+					neighborPlaneHosts.remove(host);//去重复添加
+					neighborPlaneHosts.add(host);
+				}
+			}
+			
+			if (host.getAddress() == d){
+				if (!conNeighbors.contains(host)){
+					double minDistance = Double.MAX_VALUE;
+					DTNHost minHost = null;	
+					for (DTNHost neighborHost : conNeighbors){
+						int planeOfD = d/NROF_S_EACHPLANE + 1;//两个相邻节点各自所属的轨道平面号
+						if (planeOfD == neighborHost.getNrofPlane()){
+							if (neighborHost.getLocation().distance(this.getHost().getLocation()) < minDistance)
+								minHost = neighborHost;
+						}
+					}
+					if (minHost != null){
+						neighborPlaneHosts.remove(minHost);//去重复添加
+						neighborPlaneHosts.add(minHost);
+					}
+				}
+				else{
+					neighborPlaneHosts.remove(host);//去重复添加
+					neighborPlaneHosts.add(host);
+				}
+			}
+		}
+	}
+	
 	/**
 	 * 路由更新，每次调用路由更新时的主入口
 	 */
 	@Override
 	public void update() {
 		super.update();
-		
+	
 		/*测试代码，保证neighbors和connections的一致性*/
 		List<DTNHost> conNeighbors = new ArrayList<DTNHost>();
 		for (Connection con : this.getConnections()){
@@ -150,6 +275,40 @@ public class SPNRmodify extends ActiveRouter{
 		//this.getHost().getNeighbors().changeNeighbors(conNeighbors);
 		//this.getHost().getNeighbors().updateNeighbors(this.getHost(), this.getConnections());//更新邻居节点数据库
 		/*测试代码，保证neighbors和connections的一致性*/
+		
+		/**动态更新相邻轨道平面内的邻居节点列表(因为在边缘轨道平面时会有问题)**/
+		Neighbors nei = this.getHost().getNeighbors();
+		List<DTNHost> neiList = nei.getNeighbors(this.getHost(), SimClock.getTime());//通过距离来判断的邻居，不会受到链路中断的影响	
+		neighborPlaneHosts.clear();//清空相邻轨道平面内的邻居节点列表(在边缘轨道平面时会有问题)
+		updateInterSatelliteNeighbors(neiList);//动态更新相邻轨道平面内的邻居节点列表
+		/**测试代码**/
+		if (SimClock.getTime() > 30){
+			int serialNrofPlane = this.getHost().getNrofPlane();//本节点的轨道平面编号
+			int serialNrofSatelliteInPlane = this.getHost().getNrofSatelliteINPlane();//本节点在轨道平面内的节点编号
+			initInterSatelliteNeighbors();
+			if (neighborHostsInSamePlane.size() != 2){
+				System.out.println("Size : "+neighborHostsInSamePlane+"  "+this.getHost()+"  "+serialNrofPlane+"  "+ serialNrofSatelliteInPlane +  " neighbor false : ");
+			
+				throw new SimError("neighbor size error");
+			}
+			if (neighborPlaneHosts.size() > 2)
+				throw new SimError("neighbor size error");
+			for (DTNHost host : neighborPlaneHosts){
+				if (!conNeighbors.contains(host)){
+					System.out.println("Size : "+neighborPlaneHosts+"  "+this.getHost()+"  "+serialNrofPlane+"  "+ serialNrofSatelliteInPlane +  " neighbor false : " + host+ " Plane Number: " + host.getNrofPlane() +" Number in Plane: " + host.getNrofSatelliteINPlane());
+					System.out.println("distance is: "+host.getLocation().distance(this.getHost().getLocation()));
+					throw new SimError("neighbor error");			
+				}
+			}	
+			for (DTNHost host : neighborHostsInSamePlane){
+				if (!conNeighbors.contains(host)){
+					System.out.println("Size : "+neighborHostsInSamePlane+"  "+this.getHost()+"  "+serialNrofPlane+"  "+ serialNrofSatelliteInPlane +  " neighbor false : " + host+ " Plane Number: " + host.getNrofPlane() +" Number in Plane: " + host.getNrofSatelliteINPlane());
+					System.out.println("distance is: "+host.getLocation().distance(this.getHost().getLocation()));
+					throw new SimError("neighbor error");			
+				}
+			}	
+		}
+		/**测试代码**/
 		
 		this.hosts = this.getHost().getNeighbors().getHosts();
 		List<Connection> connections = this.getConnections();  //取得所有邻居节点
@@ -254,9 +413,10 @@ public class SPNRmodify extends ActiveRouter{
 				break;//跳出循环
 			}
 		}
-				
+		
 		if (nextHopAddress > -1){
-			Connection nextCon = findConnection(nextHopAddress);
+			Connection nextCon = NetgridMultiPathMatchingProcess(nextHopAddress);//通过同一网格中含有多个节点的网格时，可以采用多路径
+			//Connection nextCon = findConnection(nextHopAddress);
 			if (nextCon == null){//能找到路径信息，但是却没能找到连接
 				if (!waitLable){//检查是不是有预测邻居链路
 					System.out.println(this.getHost()+"  "+msg+" 指定路径失效");
@@ -279,8 +439,8 @@ public class SPNRmodify extends ActiveRouter{
 	 * @param routerPath
 	 * @return
 	 */
-	public Connection NetgridMultiPathMatchingProcess(List<Tuple<Integer, Boolean>> routerPath){
-		DTNHost firstHop = this.findHostByAddress(routerPath.get(0).getKey());
+	public Connection NetgridMultiPathMatchingProcess(int hostAddress){
+		DTNHost firstHop = this.findHostByAddress(hostAddress);
 		GridCell firstGridCell = this.DTNHostToGridCell.get(firstHop);
 		
 		if (this.GridCellhasMultiDTNHosts.containsKey(firstGridCell) && this.GridCellhasMultiDTNHosts.get(firstGridCell).size() > 1){
@@ -291,7 +451,7 @@ public class SPNRmodify extends ActiveRouter{
 			for (int i = 0; i < 1;){
 				//System.out.println(multiHostsList + "  " + this.GridCellhasMultiDTNHosts.get(firstGridCell));
 				if (multiHostsList.size() == 1)
-					return findConnection(routerPath.get(0).getKey());//取第一跳的节点地址
+					return findConnection(hostAddress);//取第一跳的节点地址
 				if (multiHostsList.isEmpty() || multiHostsList.size() <= 0){
 					return con;
 				}				
@@ -307,7 +467,7 @@ public class SPNRmodify extends ActiveRouter{
 			return con;
 		}
 		else
-			return findConnection(routerPath.get(0).getKey());//取第一跳的节点地址
+			return findConnection(hostAddress);//取第一跳的节点地址
 	}
 	/**
 	 * 通过更新路由表，找到当前信息应当转发的下一跳节点，并且根据预先设置决定此计算得到的路径信息是否需要写入信息msg头部当中
@@ -335,7 +495,7 @@ public class SPNRmodify extends ActiveRouter{
 			return t;
 		}
 		
-		Connection path = NetgridMultiPathMatchingProcess(routerPath);//通过同一网格中含有多个节点的网格时，可以采用多路径
+		Connection path = NetgridMultiPathMatchingProcess(routerPath.get(0).getKey());//通过同一网格中含有多个节点的网格时，可以采用多路径
 		
 		if (path != null){
 			Tuple<Message, Connection> t = new Tuple<Message, Connection>(message, path);//找到与第一跳节点的连接
@@ -582,7 +742,15 @@ public class SPNRmodify extends ActiveRouter{
 				double t00 = System.currentTimeMillis();//复杂度测试代码
 							
 				//List<DTNHost> neiList = GN.getNeighborsNetgrids(c, netgridArrivalTime.get(c));//获取源集合中host节点的邻居节点(包括当前和未来邻居)
-				List<DTNHost> neighborHostsList = GN.getNeighborsHostsNow(GN.getGridCellFromCoordNow(c));//获取源集合中host节点的邻居节点(当前的邻居网格)
+				//List<DTNHost> neighborHostsList = GN.getNeighborsHostsNow(GN.getGridCellFromCoordNow(c));//获取源集合中host节点的邻居节点(当前的邻居网格)
+				List<DTNHost> neighborHostsList = GN.getNeighborsHostsNow(GN.cellFromCoord(c.getLocation()));//获取源集合中host节点的邻居节点(当前的邻居网格)
+				/**添加同一轨道内的相邻节点，以及相邻轨道内的最近的相邻节点**/
+				neighborHostsList.removeAll(((SPNRmodify)c.getRouter()).neighborHostsInSamePlane);//去重复
+				neighborHostsList.addAll(((SPNRmodify)c.getRouter()).neighborHostsInSamePlane);//添加同一轨道内的相邻节点
+				if (!((SPNRmodify)c.getRouter()).neighborPlaneHosts.isEmpty()){
+					neighborHostsList.removeAll(((SPNRmodify)c.getRouter()).neighborPlaneHosts);//去重复
+					neighborHostsList.addAll(((SPNRmodify)c.getRouter()).neighborPlaneHosts);//添加相邻轨道内的最近的相邻节点
+				}
 				//System.out.println("RoutingHost and time :  "+this.getHost()+this.RoutingTimeNow+"  thisHostGrid:  "+thisHostGrid  +"  SourceNetgird:  "+c+"  contains:  "+GN.getHostsFromNetgridNow(c, this.RoutingTimeNow)+"  NeighborNetgrid:  "+neighborNetgridsList.keySet()+" contains: "+neighborNetgridsList.values()+"  sourceSet:  "+sourceSet);
 				
 //				List<DTNHost> neighborHostsFromTGM = this.getHost().getNeighbors().getNeighbors(c, SimClock.getTime());
@@ -598,10 +766,12 @@ public class SPNRmodify extends ActiveRouter{
 //				else{
 //					System.out.println("error TGM: "+neighborHostsFromTGM );
 //				}
-				Neighbors nei = this.getHost().getNeighbors();
-				List<DTNHost> neiList = nei.getNeighbors(c, SimClock.getTime());	
-				System.out.println(c+ "  NrofNeighborHosts from Grid " + neighborHostsList.size() + 
-						" NrofNeighborHosts from TGM " + neiList.size() + "\n" + neighborHostsList + "\n" + neiList);
+				
+				/**测试用代码，与TGM所读取的邻居进行对比**/
+//				Neighbors nei = this.getHost().getNeighbors();
+//				List<DTNHost> neiList = nei.getNeighbors(c, SimClock.getTime());	
+//				System.out.println(c+ "  NrofNeighborHosts from Grid " + neighborHostsList.size() + 
+//						" NrofNeighborHosts from TGM " + neiList.size() + "\n" + neighborHostsList + "\n" + neiList);
 				
 				double t01 = System.currentTimeMillis();//复杂度测试代码
 				TNMCostTime += (t01-t00);				//复杂度测试代码
@@ -682,6 +852,8 @@ public class SPNRmodify extends ActiveRouter{
 //		System.out.println("cost: "+ (t1-t0)+" TNMCostTime: "+TNMCostTime);
 //		throw new SimError("Pause");	
 		//System.out.println(this.getHost()+" table: "+netgridRouterTable+" time : "+SimClock.getTime());
+		
+		this.algorithmRunningCount++;//路由算法执行次数计数器
 	}
 	
 
@@ -1003,7 +1175,7 @@ public class SPNRmodify extends ActiveRouter{
 		
 		private GridCell[][][] cells;//GridCell这个类，创建一个实例代表一个单独的网格，整个world创建了一个三维数组存储这个网格，每个网格内又存储了当前在其中的host的networkinterface
 		
-		private int cellSize;
+		private double cellSize;
 		private int rows;
 		private int cols;
 		private int zs;//新增三维变量
@@ -1045,16 +1217,16 @@ public class SPNRmodify extends ActiveRouter{
 			
 			switch(this.gridLayer){
 			case 1 : 
-				cellSize = (int) (transmitRange*0.288);//Layer=2
+				cellSize =  (transmitRange*0.2886751345);//Layer=2
 				break;
 			case 2 : 
-				cellSize = (int) (transmitRange*0.14433);//Layer=3
+				cellSize =  (transmitRange*0.144337567);//Layer=3
 				break;
 			case 3:
-				cellSize = (int) (transmitRange*0.0721687);//Layer=4
+				cellSize =  (transmitRange*0.0721687836);//Layer=4
 				break;
 			default :
-				cellSize = (int) (transmitRange*0.288);//Layer=2
+				cellSize =  (transmitRange*0.2886751345);//Layer=2
 				break;
 			}
 			//cellSize = (int) (transmitRange*0.5773502);
@@ -1073,10 +1245,10 @@ public class SPNRmodify extends ActiveRouter{
 		 * 初始化创建固定的网格
 		 * @param cellSize
 		 */
-		public void CreateGrid(int cellSize){
-			this.rows = worldSizeY/cellSize + 1;
-			this.cols = worldSizeX/cellSize + 1;
-			this.zs = worldSizeZ/cellSize + 1;//新增
+		public void CreateGrid(double cellSize){
+			this.rows = (int)Math.floor(worldSizeY/cellSize) + 1;
+			this.cols = (int)Math.floor(worldSizeX/cellSize) + 1;
+			this.zs = (int)Math.floor(worldSizeZ/cellSize) + 1;//新增
 			System.out.println(cellSize+"  "+this.rows+"  "+this.cols+"  "+this.zs);
 			// leave empty cells on both sides to make neighbor search easier 
 			this.cells = new GridCell[rows+2][cols+2][zs+2];
@@ -1223,15 +1395,22 @@ public class SPNRmodify extends ActiveRouter{
 			
 			List<DTNHost> neighborHosts = new ArrayList<DTNHost>();
 			
-			for (GridCell c : cellList){
-				if (this.gridCellToHosts.containsKey(c)){//如果不包含，这说明此邻居网格为空，里面不含任何节点
-					neighborHosts.addAll(this.gridCellToHosts.get(c));//找出这一个邻居网格内对应的所有节点
-				}
-			}	
+			for (DTNHost host : hosts){
+				GridCell cell = cellFromCoord(host.getLocation());
+				if (cellList.contains(cell))
+					neighborHosts.add(host);
+				
+			}
+//			for (GridCell c : cellList){
+//				if (this.gridCellToHosts.containsKey(c)){//如果不包含，这说明此邻居网格为空，里面不含任何节点
+//					neighborHosts.addAll(this.gridCellToHosts.get(c));//找出这一个邻居网格内对应的所有节点
+//				}
+//			}	
 			
 			//System.out.println(host+" 邻居列表   "+hostList);
 			return neighborHosts;
 		}
+		
 //		public List<DTNHost> getNeighbors(DTNHost host, double time){//获取指定时间的邻居节点(同时包含预测到TTL时间内的邻居)
 //			int num = (int)((time-SimClock.getTime())/updateInterval);
 //			time = SimClock.getTime()+num*updateInterval;
@@ -1264,6 +1443,7 @@ public class SPNRmodify extends ActiveRouter{
 //			return hostList;
 //		}
 
+		
 //		public Tuple<HashMap<DTNHost, List<Double>>, //neiList 为已经计算出的当前邻居节点列表
 //			HashMap<DTNHost, List<Double>>> getFutureNeighbors(List<DTNHost> neiList, DTNHost host, double time){
 //			int num = (int)((time-SimClock.getTime())/updateInterval);
@@ -1362,7 +1542,7 @@ public class SPNRmodify extends ActiveRouter{
 			List<GridCell> GC = new ArrayList<GridCell>();
 			/***********************************************************************/
 			switch(this.gridLayer){
-			case 1 : 
+			case 1 : //只占有%15.5的体积
 			/*两层网格分割*/
 				for (int i = -1; i < 2; i += 1){
 					for (int j = -1; j < 2; j += 1){
@@ -1372,7 +1552,7 @@ public class SPNRmodify extends ActiveRouter{
 					}
 				}
 				break;
-			case 2 : {
+			case 2 : {//m=1时，只占有%28.5的体积
 			/*三层网格分割*/
 				for (int i = -3; i <= 3; i += 1){
 					for (int j = -3; j <= 3; j += 1){
@@ -1432,7 +1612,7 @@ public class SPNRmodify extends ActiveRouter{
 				}
 				break;
 			
-			case 3:{
+			case 3:{//n1=4,n2=2时，只占有%36的体积
 				/*四层层网格分割*/
 				for (int i = -7; i <= 7; i += 1){
 					for (int j = -7; j <= 7; j += 1){
@@ -1830,9 +2010,9 @@ public class SPNRmodify extends ActiveRouter{
 		 */
 		private GridCell cellFromCoord(Coord c) {
 			// +1 due empty cells on both sides of the matrix
-			int row = (int)(c.getY()/cellSize) + 1; 
-			int col = (int)(c.getX()/cellSize) + 1;
-			int z = (int)(c.getZ()/cellSize) + 1;
+			int row = (int)Math.ceil(c.getY()/cellSize); 
+			int col = (int)Math.ceil(c.getX()/cellSize);
+			int z = (int)Math.ceil(c.getZ()/cellSize);
 			if (!(row > 0 && row <= rows && col > 0 && col <= cols))
 				throw new SimError("Location " + c + " is out of world's bounds");
 			//assert row > 0 && row <= rows && col > 0 && col <= cols : "Location " + 

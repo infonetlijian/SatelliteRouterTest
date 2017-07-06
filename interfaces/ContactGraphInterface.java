@@ -11,6 +11,7 @@ import util.Tuple;
 import core.CBRConnection;
 import core.Connection;
 import core.DTNHost;
+import core.Message;
 import core.Neighbors;
 import core.NetworkInterface;
 import core.Settings;
@@ -197,6 +198,7 @@ public class ContactGraphInterface  extends NetworkInterface {
 		
 		clearInterruptHostsList();//清除需要断开连接的节点列表
 	}
+
 	/**需要断开连接的节点列表**/
 	private List<DTNHost> interruptHostsList = new ArrayList<DTNHost>();
 	/**

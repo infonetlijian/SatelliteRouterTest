@@ -78,7 +78,8 @@ public class Neighbors {
 			if (h == host)
 				continue;
 			if (JudgeNeighbors(myLocation, loc.get(h)) == true){
-				//System.out.println(host+"  locate  "+myLocation+"  "+loc.get(host));
+				double distance = myLocation.distance(loc.get(h));
+				//System.out.println(host+"  locate  "+myLocation+" to "+h + "  the distance is: " + distance);
 				neiHost.add(h);
 			}
 		}

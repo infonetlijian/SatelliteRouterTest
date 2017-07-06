@@ -85,6 +85,7 @@ public class CGR extends ActiveRouter{
 	double simEndTime;
 	private HashMap<DTNHost, List<Tuple<DTNHost, DTNHost>>> contactGraph;
 	
+	int algorithmRunningCount = 0;//核心路由算法调用次数计数器
 	/**
 	 * 传入事先定好的接触图
 	 * @param contactGraph
@@ -135,6 +136,45 @@ public class CGR extends ActiveRouter{
 //				super.addToMessages(con.getMessage(), false);//对于因为链路中断而丢失的消息，重新放回发送方的队列中，并且删除对方节点的incoming信息
 //			}
 //		}
+	}
+	/**
+	 * 找到节点地址对应的节点DTNHost
+	 * @param address
+	 * @return
+	 */
+	public DTNHost findHostFromAddress(int address){
+		for (DTNHost h : this.getHost().getHostsList()){
+			if (h.getAddress() == address)
+				return h;
+		}
+		return null;
+	}
+	/**
+	 * 根据需要构建接触链路，但是一个节点同一时间只能建立一个链路用于传输
+	 */
+	public void constructContactLink(int nextHopAddress){
+		DTNHost nextHop = findHostFromAddress(nextHopAddress);
+		boolean isTransferring = false;
+		if (this.isTransferring())
+			return;
+		if (!nextHop.getConnections().isEmpty()){
+			for (Connection con : nextHop.getConnections()){
+				if (con.isTransferring()){
+					isTransferring = true;
+					return;
+				}
+				if (con.getOtherNode(nextHop) == this.getHost())//如果已经存在了本节点到下一个节点之间的链路，就不用再建立了
+					return;
+				else{
+					nextHop.getInterface(1).destroyConnection(nextHop.getInterface(1));//不在传输的链路就直接销毁，需要用的时候再建立
+					nextHop.getInterface(1).getConnections().remove(con);
+				}
+			}
+		}
+		if (isTransferring)//如果下一个节点已经被占用了，就不建立链路
+			return;
+		if (nextHop.getLocation().distance(this.getHost().getLocation()) <= this.transmitRange)//在距离范围内的建立连接
+			this.getHost().getInterface(1).connect(nextHop.getInterface(1));//函数内部自动减一
 	}
 	/**
 	 * 路由更新，每次调用路由更新时的主入口
@@ -263,6 +303,9 @@ public class CGR extends ActiveRouter{
 		}
 				
 		if (nextHopAddress > -1){
+			/**CGR独有，在需要的时候建立链路**/
+			constructContactLink(nextHopAddress);
+			/**CGR独有，在需要的时候建立链路**/
 			Connection nextCon = findConnection(nextHopAddress);
 			if (nextCon == null){//能找到路径信息，但是却没能找到连接
 				//说明是未来的contact，信息等待
@@ -273,6 +316,7 @@ public class CGR extends ActiveRouter{
 //							findPathFromRouterTabel(msg, this.getConnections(), true);//清除原先路径信息之后再重新寻路
 //					return t;
 //				}
+				throw new SimError("connection setup fail!");
 			}else{
 				Tuple<Message, Connection> t = new 
 						Tuple<Message, Connection>(msg, nextCon);
@@ -299,30 +343,20 @@ public class CGR extends ActiveRouter{
 		if (msgPathLabel == true){//如果写入路径信息标志位真，就写入路径消息
 			message.updateProperty(MSG_ROUTERPATH, routerPath);
 		}
-					
+		
+		/**CGR独有，在需要的时候建立链路**/
+		int nextHopAddress = routerPath.get(0).getKey();
+		constructContactLink(nextHopAddress);
+		/**CGR独有，在需要的时候建立链路**/
+		
 		Connection path = findConnection(routerPath.get(0).getKey());//取第一跳的节点地址
 		if (path != null){
 			Tuple<Message, Connection> t = new Tuple<Message, Connection>(message, path);//找到与第一跳节点的连接
 			return t;
 		}
 		else{			
-			if (routerPath.get(0).getValue()){
-				System.out.println("第一跳预测");
-				return null;
-				//DTNHost nextHop = this.getHostFromAddress(routerPath.get(0).getKey()); 
-				//this.busyLabel.put(message.getId(), startTime);//设置一个等待
-			}
-			else{
-				System.out.println(message+"  "+message.getProperty(MSG_ROUTERPATH));
-				System.out.println(this.getHost()+"  "+this.getHost().getAddress()+"  "+this.getHost().getConnections());
-				System.out.println(routerPath);
-				System.out.println(this.routerTable);
-				System.out.println(this.getHost().getNeighbors().getNeighbors());
-				System.out.println(this.getHost().getNeighbors().getNeighborsLiveTime());
-				throw new SimError("No such connection: "+ routerPath.get(0) + 
-						" at routerTable " + this);		
-			//this.routerTable.remove(message.getTo());	
-			}
+			throw new SimError("connection setup fail!");
+			//return null;
 		}
 	}
 	/**
@@ -549,6 +583,7 @@ public class CGR extends ActiveRouter{
 //		throw new SimError("Pause");	
 		
 		//System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());
+		algorithmRunningCount++;//核心路由算法调用次数计数器
 	}
 	/**
 	 * 冒泡排序
@@ -575,7 +610,7 @@ public class CGR extends ActiveRouter{
 	 * EASR(earliest arrival space routing algorithm)，执行最短路径路由算法
 	 * @param msg
 	 */
-	public void PathSearch(Message msg){
+	public List<Tuple<Integer, Boolean>> PathSearch(Message msg){
 		this.routerTable.clear();
 		this.arrivalTime.clear();
 		
@@ -657,7 +692,13 @@ public class CGR extends ActiveRouter{
 //			if (routerTable.containsKey(msg.getTo()))//如果中途找到需要的路徑，就直接退出搜索
 //				break;
 		}
-		System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());
+		
+		if (routerTable.containsKey(msg.getTo())){
+			return routerTable.get(msg.getTo());//返回最短路径
+		}
+		else
+			return null;
+		//System.out.println(this.getHost()+" table: "+routerTable+" time : "+SimClock.getTime());
 	}
 	
 

@@ -447,7 +447,7 @@ public class SimScenario implements Serializable {
 						mmProto, mRouterProto);
 
 				int nrofPlane = j/NROF_S_EACHPLANE + 1;
-				int nrofSatelliteINPlane = j - (nrofPlane - 1) * NROF_S_EACHPLANE;
+				int nrofSatelliteINPlane = j - (nrofPlane - 1) * NROF_S_EACHPLANE + 1;//注意，j从0开始计数
 				
 				if (typeofSatellites == "LEO")
 					host.setSatelliteParameters(TOTAL_SATELLITES, TOTAL_PLANE, nrofPlane,

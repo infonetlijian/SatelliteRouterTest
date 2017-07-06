@@ -85,14 +85,14 @@ Group.sendQueue = 1
 Group.router = SPNRmodify
 #Group.router = CGR
 Group.router.CGR.LinkDurationTimesOfUpdateInterval = 10
-Group.layer = 3
+Group.layer = 2
 Group.Pre_or_onlineOrbitCalculation = preOrbitCalculation
 #Group.Pre_or_onlineOrbitCalculation = onlineOrbitCalculation
 #Group.router = EASRRouter
 #Group.router = ClusterRouterBasedonGridRouter
 #Group.router = DijsktraRouter
-#Group.msgPathLabel = true
-Group.msgPathLabel = false
+Group.msgPathLabel = true
+#Group.msgPathLabel = false
 Group.bufferSize = 100M
 Group.waitTime = 0, 120
 # All nodes have the bluetooth interface
@@ -101,7 +101,7 @@ Group.interface1 = Interface
 # Walking speeds
 Group.speed = 0.5, 1.5
 # Message TTL of 300 minutes (5 hours)
-Group.msgTtl = 30
+Group.msgTtl = 10
 
 #Group.nrofHosts = [10;20;30;40;50]
 Group.nrofHosts = 66
@@ -121,11 +121,11 @@ Events1.class = MessageEventGenerator
 # (following settings are specific for the MessageEventGenerator class)
 # Creation interval in seconds (one new message every 25 to 35 seconds)
 #Events1.interval = 1,100
-Events1.interval = 1,60
+Events1.interval = 6,6
 # Message sizes (500kB - 2MB)
 
 #Events1.size = 100k,1M
-Events1.size = 30k,30k
+Events1.size = 50k,50k
 # range of message source/destination addresses
 #Events1.hosts = [0,9;0,19;0,29;0,39;0,49]修改，注意hosts和tohosts包括下界但不包括上界，即[0, 9)
 Events1.hosts = [0,66]

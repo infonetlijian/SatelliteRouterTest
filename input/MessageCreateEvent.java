@@ -50,6 +50,7 @@ public class MessageCreateEvent extends MessageEvent {
 		
 		m.setResponseSize(this.responseSize);
 		from.createNewMessage(m);//把新产生的消息放到对应节点的router里面保存
+		
 	}
 
 	@Override
